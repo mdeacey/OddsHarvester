@@ -60,6 +60,7 @@ def test_parse_and_validate_args_valid(cli_handler):
             scrape_odds_history=False,
             target_bookmaker=None,
             preview_submarkets_only=False,
+            all=False,
         )
 
         parsed_args = cli_handler.parse_and_validate_args()
@@ -84,6 +85,7 @@ def test_parse_and_validate_args_valid(cli_handler):
             "scrape_odds_history": False,
             "target_bookmaker": None,
             "preview_submarkets_only": False,
+            "all": False,
         }
 
         mock_validate_args.assert_called_once_with(mock_parse_args.return_value)
@@ -139,3 +141,52 @@ def test_parse_and_validate_args_invalid_args(cli_handler):
         cli_handler.parse_and_validate_args()
 
         mock_exit.assert_called_once_with(1)
+
+
+def test_parse_and_validate_args_with_all_flag(cli_handler):
+    """Test that the all parameter is correctly passed through."""
+    mock_args = [
+        "scrape_upcoming",
+        "--all",
+        "--date",
+        "2024-02-25",
+        "--markets",
+        "1x2",
+    ]
+
+    with (
+        patch("sys.argv", ["cli_tool.py", *mock_args]),
+        patch.object(cli_handler.parser, "parse_args") as mock_parse_args,
+        patch.object(cli_handler.validator, "validate_args") as mock_validate_args,
+    ):
+        mock_parse_args.return_value = MagicMock(
+            command="scrape_upcoming",
+            all=True,
+            date="2024-02-25",
+            sport=None,
+            leagues=None,
+            markets=["1x2"],
+            season=None,
+            file_path=None,
+            max_pages=None,
+            proxies=None,
+            browser_user_agent=None,
+            browser_locale_timezone=None,
+            browser_timezone_id=None,
+            match_links=None,
+            scrape_odds_history=False,
+            target_bookmaker=None,
+            preview_submarkets_only=False,
+            storage="local",
+            format="json",
+            headless=False,
+        )
+
+        parsed_args = cli_handler.parse_and_validate_args()
+
+        assert parsed_args["all"] is True
+        assert parsed_args["command"] == "scrape_upcoming"
+        assert parsed_args["date"] == "2024-02-25"
+        assert parsed_args["markets"] == ["1x2"]
+
+        mock_validate_args.assert_called_once_with(mock_parse_args.return_value)

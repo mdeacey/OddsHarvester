@@ -1,5 +1,5 @@
 import asyncio
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, Mock, patch
 
 import pytest
 
@@ -7,7 +7,7 @@ from src.core.browser_helper import BrowserHelper
 from src.core.odds_portal_market_extractor import OddsPortalMarketExtractor
 from src.core.odds_portal_scraper import OddsPortalScraper
 from src.core.playwright_manager import PlaywrightManager
-from src.core.scraper_app import TRANSIENT_ERRORS, _scrape_multiple_leagues, retry_scrape, run_scraper
+from src.core.scraper_app import TRANSIENT_ERRORS, _scrape_multiple_leagues, _scrape_all_sports, retry_scrape, run_scraper
 from src.utils.command_enum import CommandEnum
 
 
@@ -427,3 +427,190 @@ def test_run_scraper_validation(command, params, error_message):
         asyncio.run(validate_only())
 
     assert error_message in str(exc_info.value)
+
+
+@pytest.mark.asyncio
+async def test_scrape_all_sports_success():
+    """Test _scrape_all_sports with successful scraping for all sports."""
+    scraper_mock = MagicMock()
+    scrape_func_mock = AsyncMock()
+
+    # Mock successful scraping for each sport - simulate returning data for each sport
+    expected_results = []
+    for i in range(23):  # 23 sports
+        sport_data = [{"sport": f"sport_{i}", "matches": [f"match_{j}" for j in range(i+1)]}]
+        expected_results.extend(sport_data)
+        scrape_func_mock.side_effect = None
+        scrape_func_mock.return_value = sport_data
+
+    # We need to set up the mock to return different data for each sport
+    call_count = 0
+    async def mock_scrape_func(*args, **kwargs):
+        nonlocal call_count
+        result = [{"sport": f"sport_{call_count}", "matches": [f"match_{j}" for j in range(call_count+1)]}]
+        call_count += 1
+        return result
+
+    scrape_func_mock.side_effect = mock_scrape_func
+
+    with patch("src.core.scraper_app.retry_scrape", scrape_func_mock):
+        with patch("src.core.scraper_app.Sport") as sport_mock:
+            # Mock the Sport enum to have exactly 23 sports
+            mock_sports = [MagicMock(value=f"sport_{i}") for i in range(23)]
+            sport_mock.__iter__ = Mock(return_value=iter(mock_sports))
+
+            result = await _scrape_all_sports(
+                scraper=scraper_mock,
+                scrape_func=scrape_func_mock,
+                date="20250225",
+                markets=["1x2"],
+            )
+
+    # Verify all 23 sports were processed
+    assert scrape_func_mock.call_count == 23
+
+    # Verify combined results (total matches across all sports)
+    total_expected_matches = sum(i + 1 for i in range(23))
+    assert len(result) == total_expected_matches
+
+
+@pytest.mark.asyncio
+async def test_scrape_all_sports_with_failures():
+    """Test _scrape_all_sports with some sport failures."""
+    scraper_mock = MagicMock()
+    scrape_func_mock = AsyncMock()
+
+    # Mock mixed success/failure - 5 failures out of 23 sports
+    call_count = 0
+    async def mock_scrape_func(*args, **kwargs):
+        nonlocal call_count
+        call_count += 1
+        if call_count in [5, 10, 15, 18, 22]:  # 5 specific failures
+            raise Exception(f"Failed to scrape sport {call_count}")
+        return [{"sport": f"sport_{call_count}", "matches": [f"match_{call_count}"]}]
+
+    scrape_func_mock.side_effect = mock_scrape_func
+
+    with patch("src.core.scraper_app.retry_scrape", scrape_func_mock):
+        with patch("src.core.scraper_app.Sport") as sport_mock:
+            # Mock the Sport enum to have exactly 23 sports
+            mock_sports = [MagicMock(value=f"sport_{i}") for i in range(23)]
+            sport_mock.__iter__ = Mock(return_value=iter(mock_sports))
+
+            result = await _scrape_all_sports(
+                scraper=scraper_mock,
+                scrape_func=scrape_func_mock,
+                season="2023",
+                markets=["1x2"],
+            )
+
+    # Verify all 23 sports were attempted
+    assert scrape_func_mock.call_count == 23
+
+    # Verify only successful results are included (23 - 5 = 18 successful)
+    assert len(result) == 18
+
+
+@pytest.mark.asyncio
+@patch("src.core.scraper_app.OddsPortalScraper")
+@patch("src.core.scraper_app.OddsPortalMarketExtractor")
+@patch("src.core.scraper_app.BrowserHelper")
+@patch("src.core.scraper_app.PlaywrightManager")
+@patch("src.core.scraper_app.ProxyManager")
+@patch("src.core.scraper_app.SportMarketRegistrar")
+async def test_run_scraper_upcoming_all_flag(
+    sport_market_registrar_mock,
+    proxy_manager_mock,
+    playwright_manager_mock,
+    browser_helper_mock,
+    market_extractor_mock,
+    scraper_cls_mock,
+    setup_mocks,
+):
+    """Test run_scraper with upcoming command and --all flag."""
+    scraper_mock = setup_mocks["scraper_mock"]
+    scraper_cls_mock.return_value = scraper_mock
+
+    proxy_manager_instance = MagicMock()
+    proxy_manager_instance.get_current_proxy.return_value = {"server": "test-proxy"}
+    proxy_manager_mock.return_value = proxy_manager_instance
+
+    with patch("src.core.scraper_app._scrape_all_sports") as multi_sport_mock:
+        multi_sport_mock.return_value = [{"sport": "football", "matches": ["match1", "match2"]}]
+
+        result = await run_scraper(
+            command=CommandEnum.UPCOMING_MATCHES,
+            all=True,
+            date="20250225",
+            markets=["1x2"],
+            headless=True,
+        )
+
+        # Verify _scrape_all_sports was called instead of regular scraping
+        multi_sport_mock.assert_called_once()
+        call_args = multi_sport_mock.call_args
+        assert call_args[1]["date"] == "20250225"
+        assert call_args[1]["markets"] == ["1x2"]
+
+        # Verify playwright setup
+        scraper_mock.start_playwright.assert_called_once_with(
+            headless=True,
+            browser_user_agent=None,
+            browser_locale_timezone=None,
+            browser_timezone_id=None,
+            proxy={"server": "test-proxy"},
+        )
+
+        assert result == [{"sport": "football", "matches": ["match1", "match2"]}]
+
+
+@pytest.mark.asyncio
+@patch("src.core.scraper_app.OddsPortalScraper")
+@patch("src.core.scraper_app.OddsPortalMarketExtractor")
+@patch("src.core.scraper_app.BrowserHelper")
+@patch("src.core.scraper_app.PlaywrightManager")
+@patch("src.core.scraper_app.ProxyManager")
+@patch("src.core.scraper_app.SportMarketRegistrar")
+async def test_run_scraper_historic_all_flag(
+    sport_market_registrar_mock,
+    proxy_manager_mock,
+    playwright_manager_mock,
+    browser_helper_mock,
+    market_extractor_mock,
+    scraper_cls_mock,
+    setup_mocks,
+):
+    """Test run_scraper with historic command and --all flag."""
+    scraper_mock = setup_mocks["scraper_mock"]
+    scraper_cls_mock.return_value = scraper_mock
+
+    proxy_manager_instance = MagicMock()
+    proxy_manager_instance.get_current_proxy.return_value = {"server": "test-proxy"}
+    proxy_manager_mock.return_value = proxy_manager_instance
+
+    with patch("src.core.scraper_app._scrape_all_sports") as multi_sport_mock:
+        multi_sport_mock.return_value = [
+            {"sport": "tennis", "matches": ["match1"]},
+            {"sport": "basketball", "matches": ["match2", "match3"]},
+        ]
+
+        result = await run_scraper(
+            command=CommandEnum.HISTORIC,
+            all=True,
+            season="2023-2024",
+            markets=["1x2", "btts"],
+            scrape_odds_history=True,
+            headless=False,
+        )
+
+        # Verify _scrape_all_sports was called instead of regular scraping
+        multi_sport_mock.assert_called_once()
+        call_args = multi_sport_mock.call_args
+        assert call_args[1]["season"] == "2023-2024"
+        assert call_args[1]["markets"] == ["1x2", "btts"]
+        assert call_args[1]["scrape_odds_history"] is True
+
+        assert result == [
+            {"sport": "tennis", "matches": ["match1"]},
+            {"sport": "basketball", "matches": ["match2", "match3"]},
+        ]

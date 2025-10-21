@@ -38,6 +38,11 @@ class CLIArgumentParser:
         parser = subparsers.add_parser("scrape_upcoming", help="Scrape odds for upcoming matches.")
         self._add_common_arguments(parser)
         parser.add_argument("--date", type=str, help="📅 Date for upcoming matches (format: YYYYMMDD).")
+        parser.add_argument(
+            "--all",
+            action="store_true",
+            help="🌐 Scrape all 23 supported sports with a single command. When used with --date, scrapes all sports for that date. Without --date, uses today's date.",
+        )
 
     def _add_historic_parser(self, subparsers):
         parser = subparsers.add_parser(
@@ -51,6 +56,11 @@ class CLIArgumentParser:
             help="📅 Season to scrape (YYYY, YYYY-YYYY, or 'current'; e.g., 2023, 2022-2023, current).",
         )
         parser.add_argument("--max_pages", type=int, help="📑 Maximum number of pages to scrape (optional).")
+        parser.add_argument(
+            "--all",
+            action="store_true",
+            help="🌐 Scrape all 23 supported sports with a single command for the specified season.",
+        )
 
     def _add_common_arguments(self, parser):
         parser.add_argument(

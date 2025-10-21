@@ -103,6 +103,67 @@ def test_parser_defaults():
     assert args.odds_format == "Decimal Odds"
     assert args.concurrency_tasks == 3
     assert args.date is None
+    assert args.all is False
+
+
+def test_parse_scrape_upcoming_with_all_flag(parser):
+    """Test parsing scrape_upcoming command with --all flag."""
+    args = parser.parse_args(
+        [
+            "scrape_upcoming",
+            "--all",
+            "--date",
+            "20250225",
+            "--markets",
+            "1x2,btts",
+            "--storage",
+            "local",
+        ]
+    )
+    assert args.command == "scrape_upcoming"
+    assert args.all is True
+    assert args.date == "20250225"
+    assert args.markets == ["1x2", "btts"]
+    assert args.storage == "local"
+
+
+def test_parse_scrape_upcoming_all_without_date(parser):
+    """Test parsing scrape_upcoming with --all flag but no date (should default to None)."""
+    args = parser.parse_args(
+        [
+            "scrape_upcoming",
+            "--all",
+            "--markets",
+            "1x2",
+        ]
+    )
+    assert args.command == "scrape_upcoming"
+    assert args.all is True
+    assert args.date is None
+    assert args.markets == ["1x2"]
+
+
+def test_parse_scrape_historic_with_all_flag(parser):
+    """Test parsing scrape_historic command with --all flag."""
+    args = parser.parse_args(
+        [
+            "scrape_historic",
+            "--all",
+            "--season",
+            "2023-2024",
+            "--markets",
+            "1x2,btts",
+            "--storage",
+            "remote",
+            "--headless",
+        ]
+    )
+    assert args.command == "scrape_historic"
+    assert args.all is True
+    assert args.season == "2023-2024"
+    assert args.markets == ["1x2", "btts"]
+    assert args.storage == "remote"
+    assert args.headless is True
 
 
 def test_invalid_sport(parser):
