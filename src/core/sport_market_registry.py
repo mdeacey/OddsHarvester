@@ -1,21 +1,47 @@
 from typing import ClassVar
 
 from src.utils.sport_market_constants import (
+    AmericanFootballMarket,
+    AmericanFootballOverUnderMarket,
+    AussieRulesMarket,
+    AussieRulesOverUnderMarket,
+    BadmintonMarket,
+    BadmintonOverUnderMarket,
+    BandyMarket,
+    BandyOverUnderMarket,
     BaseballOverUnderMarket,
     BasketballAsianHandicapMarket,
     BasketballOverUnderMarket,
+    BoxingMarket,
+    CricketMarket,
+    CricketOverUnderMarket,
+    DartsMarket,
+    EsportsMarket,
+    FloorballMarket,
+    FloorballOverUnderMarket,
     FootballAsianHandicapMarket,
     FootballEuropeanHandicapMarket,
     FootballOverUnderMarket,
+    FutsalMarket,
+    FutsalOverUnderMarket,
+    HandballMarket,
+    HandballOverUnderMarket,
     IceHockeyOverUnderMarket,
+    MmaMarket,
     RugbyHandicapMarket,
     RugbyOverUnderMarket,
+    SnookerMarket,
     Sport,
+    TableTennisMarket,
     TennisAsianHandicapGamesMarket,
     TennisAsianHandicapSetsMarket,
     TennisCorrectScoreMarket,
     TennisOverUnderGamesMarket,
     TennisOverUnderSetsMarket,
+    VolleyballMarket,
+    VolleyballOverUnderMarket,
+    WaterPoloMarket,
+    WaterPoloOverUnderMarket,
 )
 
 
@@ -374,6 +400,316 @@ class SportMarketRegistrar:
             )
 
     @classmethod
+    def register_american_football_markets(cls):
+        """Registers all American football betting markets."""
+        SportMarketRegistry.register(
+            Sport.AMERICAN_FOOTBALL,
+            {
+                "1x2": cls.create_market_lambda("1X2", odds_labels=["1", "X", "2"]),
+                "home_away": cls.create_market_lambda("Home/Away", odds_labels=["1", "2"]),
+                "point_spread": cls.create_market_lambda("Point Spread", odds_labels=["point_spread_team1", "point_spread_team2"]),
+            },
+        )
+
+        # Register Over/Under Markets
+        for over_under in AmericanFootballOverUnderMarket:
+            numeric_part = over_under.value.replace("over_under_", "").replace("_", ".")
+            SportMarketRegistry.register(
+                Sport.AMERICAN_FOOTBALL,
+                {
+                    over_under.value: cls.create_market_lambda(
+                        main_market="Over/Under",
+                        specific_market=f"Over/Under +{numeric_part}",
+                        odds_labels=["odds_over", "odds_under"],
+                    )
+                },
+            )
+
+    @classmethod
+    def register_aussie_rules_markets(cls):
+        """Registers all Aussie Rules betting markets."""
+        SportMarketRegistry.register(
+            Sport.AUSSIE_RULES,
+            {
+                "1x2": cls.create_market_lambda("1X2", odds_labels=["1", "X", "2"]),
+                "home_away": cls.create_market_lambda("Home/Away", odds_labels=["1", "2"]),
+                "handicap": cls.create_market_lambda("Handicap", odds_labels=["handicap_team1", "handicap_team2"]),
+            },
+        )
+
+        # Register Over/Under Markets
+        for over_under in AussieRulesOverUnderMarket:
+            numeric_part = over_under.value.replace("over_under_", "").replace("_", ".")
+            SportMarketRegistry.register(
+                Sport.AUSSIE_RULES,
+                {
+                    over_under.value: cls.create_market_lambda(
+                        main_market="Over/Under",
+                        specific_market=f"Over/Under +{numeric_part}",
+                        odds_labels=["odds_over", "odds_under"],
+                    )
+                },
+            )
+
+    @classmethod
+    def register_badminton_markets(cls):
+        """Registers all badminton betting markets."""
+        SportMarketRegistry.register(
+            Sport.BADMINTON,
+            {
+                "match_winner": cls.create_market_lambda("Home/Away", odds_labels=["player_1", "player_2"]),
+            },
+        )
+
+        # Register Over/Under Markets
+        for over_under in BadmintonOverUnderMarket:
+            numeric_part = over_under.value.replace("over_under_", "").replace("_", ".")
+            SportMarketRegistry.register(
+                Sport.BADMINTON,
+                {
+                    over_under.value: cls.create_market_lambda(
+                        main_market="Over/Under",
+                        specific_market=f"Over/Under +{numeric_part}",
+                        odds_labels=["odds_over", "odds_under"],
+                    )
+                },
+            )
+
+    @classmethod
+    def register_bandy_markets(cls):
+        """Registers all bandy betting markets."""
+        SportMarketRegistry.register(
+            Sport.BANDY,
+            {
+                "1x2": cls.create_market_lambda("1X2", odds_labels=["1", "X", "2"]),
+                "home_away": cls.create_market_lambda("Home/Away", odds_labels=["1", "2"]),
+            },
+        )
+
+        # Register Over/Under Markets
+        for over_under in BandyOverUnderMarket:
+            numeric_part = over_under.value.replace("over_under_", "").replace("_", ".")
+            SportMarketRegistry.register(
+                Sport.BANDY,
+                {
+                    over_under.value: cls.create_market_lambda(
+                        main_market="Over/Under",
+                        specific_market=f"Over/Under +{numeric_part}",
+                        odds_labels=["odds_over", "odds_under"],
+                    )
+                },
+            )
+
+    @classmethod
+    def register_boxing_markets(cls):
+        """Registers all boxing betting markets."""
+        SportMarketRegistry.register(
+            Sport.BOXING,
+            {
+                "match_winner": cls.create_market_lambda("Home/Away", odds_labels=["fighter_1", "fighter_2"]),
+            },
+        )
+
+    @classmethod
+    def register_cricket_markets(cls):
+        """Registers all cricket betting markets."""
+        SportMarketRegistry.register(
+            Sport.CRICKET,
+            {
+                "match_winner": cls.create_market_lambda("Home/Away", odds_labels=["team_1", "team_2"]),
+            },
+        )
+
+        # Register Over/Under Markets
+        for over_under in CricketOverUnderMarket:
+            numeric_part = over_under.value.replace("over_under_", "").replace("_", ".")
+            SportMarketRegistry.register(
+                Sport.CRICKET,
+                {
+                    over_under.value: cls.create_market_lambda(
+                        main_market="Over/Under",
+                        specific_market=f"Over/Under +{numeric_part}",
+                        odds_labels=["odds_over", "odds_under"],
+                    )
+                },
+            )
+
+    @classmethod
+    def register_darts_markets(cls):
+        """Registers all darts betting markets."""
+        SportMarketRegistry.register(
+            Sport.DARTS,
+            {
+                "match_winner": cls.create_market_lambda("Home/Away", odds_labels=["player_1", "player_2"]),
+            },
+        )
+
+    @classmethod
+    def register_esports_markets(cls):
+        """Registers all esports betting markets."""
+        SportMarketRegistry.register(
+            Sport.ESPORTS,
+            {
+                "match_winner": cls.create_market_lambda("Home/Away", odds_labels=["team_1", "team_2"]),
+            },
+        )
+
+    @classmethod
+    def register_floorball_markets(cls):
+        """Registers all floorball betting markets."""
+        SportMarketRegistry.register(
+            Sport.FLOORBALL,
+            {
+                "1x2": cls.create_market_lambda("1X2", odds_labels=["1", "X", "2"]),
+                "home_away": cls.create_market_lambda("Home/Away", odds_labels=["1", "2"]),
+            },
+        )
+
+        # Register Over/Under Markets
+        for over_under in FloorballOverUnderMarket:
+            numeric_part = over_under.value.replace("over_under_", "").replace("_", ".")
+            SportMarketRegistry.register(
+                Sport.FLOORBALL,
+                {
+                    over_under.value: cls.create_market_lambda(
+                        main_market="Over/Under",
+                        specific_market=f"Over/Under +{numeric_part}",
+                        odds_labels=["odds_over", "odds_under"],
+                    )
+                },
+            )
+
+    @classmethod
+    def register_futsal_markets(cls):
+        """Registers all futsal betting markets."""
+        SportMarketRegistry.register(
+            Sport.FUTSAL,
+            {
+                "1x2": cls.create_market_lambda("1X2", odds_labels=["1", "X", "2"]),
+                "home_away": cls.create_market_lambda("Home/Away", odds_labels=["1", "2"]),
+            },
+        )
+
+        # Register Over/Under Markets
+        for over_under in FutsalOverUnderMarket:
+            numeric_part = over_under.value.replace("over_under_", "").replace("_", ".")
+            SportMarketRegistry.register(
+                Sport.FUTSAL,
+                {
+                    over_under.value: cls.create_market_lambda(
+                        main_market="Over/Under",
+                        specific_market=f"Over/Under +{numeric_part}",
+                        odds_labels=["odds_over", "odds_under"],
+                    )
+                },
+            )
+
+    @classmethod
+    def register_handball_markets(cls):
+        """Registers all handball betting markets."""
+        SportMarketRegistry.register(
+            Sport.HANDBALL,
+            {
+                "1x2": cls.create_market_lambda("1X2", odds_labels=["1", "X", "2"]),
+                "home_away": cls.create_market_lambda("Home/Away", odds_labels=["1", "2"]),
+            },
+        )
+
+        # Register Over/Under Markets
+        for over_under in HandballOverUnderMarket:
+            numeric_part = over_under.value.replace("over_under_", "").replace("_", ".")
+            SportMarketRegistry.register(
+                Sport.HANDBALL,
+                {
+                    over_under.value: cls.create_market_lambda(
+                        main_market="Over/Under",
+                        specific_market=f"Over/Under +{numeric_part}",
+                        odds_labels=["odds_over", "odds_under"],
+                    )
+                },
+            )
+
+    @classmethod
+    def register_mma_markets(cls):
+        """Registers all MMA betting markets."""
+        SportMarketRegistry.register(
+            Sport.MMA,
+            {
+                "match_winner": cls.create_market_lambda("Home/Away", odds_labels=["fighter_1", "fighter_2"]),
+            },
+        )
+
+    @classmethod
+    def register_snooker_markets(cls):
+        """Registers all snooker betting markets."""
+        SportMarketRegistry.register(
+            Sport.SNOOKER,
+            {
+                "match_winner": cls.create_market_lambda("Home/Away", odds_labels=["player_1", "player_2"]),
+            },
+        )
+
+    @classmethod
+    def register_table_tennis_markets(cls):
+        """Registers all table tennis betting markets."""
+        SportMarketRegistry.register(
+            Sport.TABLE_TENNIS,
+            {
+                "match_winner": cls.create_market_lambda("Home/Away", odds_labels=["player_1", "player_2"]),
+            },
+        )
+
+    @classmethod
+    def register_volleyball_markets(cls):
+        """Registers all volleyball betting markets."""
+        SportMarketRegistry.register(
+            Sport.VOLLEYBALL,
+            {
+                "1x2": cls.create_market_lambda("1X2", odds_labels=["1", "X", "2"]),
+                "home_away": cls.create_market_lambda("Home/Away", odds_labels=["1", "2"]),
+            },
+        )
+
+        # Register Over/Under Markets
+        for over_under in VolleyballOverUnderMarket:
+            numeric_part = over_under.value.replace("over_under_", "").replace("_", ".")
+            SportMarketRegistry.register(
+                Sport.VOLLEYBALL,
+                {
+                    over_under.value: cls.create_market_lambda(
+                        main_market="Over/Under",
+                        specific_market=f"Over/Under +{numeric_part}",
+                        odds_labels=["odds_over", "odds_under"],
+                    )
+                },
+            )
+
+    @classmethod
+    def register_water_polo_markets(cls):
+        """Registers all water polo betting markets."""
+        SportMarketRegistry.register(
+            Sport.WATER_POLO,
+            {
+                "1x2": cls.create_market_lambda("1X2", odds_labels=["1", "X", "2"]),
+                "home_away": cls.create_market_lambda("Home/Away", odds_labels=["1", "2"]),
+            },
+        )
+
+        # Register Over/Under Markets
+        for over_under in WaterPoloOverUnderMarket:
+            numeric_part = over_under.value.replace("over_under_", "").replace("_", ".")
+            SportMarketRegistry.register(
+                Sport.WATER_POLO,
+                {
+                    over_under.value: cls.create_market_lambda(
+                        main_market="Over/Under",
+                        specific_market=f"Over/Under +{numeric_part}",
+                        odds_labels=["odds_over", "odds_under"],
+                    )
+                },
+            )
+
+    @classmethod
     def register_all_markets(cls):
         """Registers all sports markets."""
         cls.register_football_markets()
@@ -383,3 +719,19 @@ class SportMarketRegistrar:
         cls.register_rugby_union_markets()
         cls.register_ice_hockey_markets()
         cls.register_baseball_markets()
+        cls.register_american_football_markets()
+        cls.register_aussie_rules_markets()
+        cls.register_badminton_markets()
+        cls.register_bandy_markets()
+        cls.register_boxing_markets()
+        cls.register_cricket_markets()
+        cls.register_darts_markets()
+        cls.register_esports_markets()
+        cls.register_floorball_markets()
+        cls.register_futsal_markets()
+        cls.register_handball_markets()
+        cls.register_mma_markets()
+        cls.register_snooker_markets()
+        cls.register_table_tennis_markets()
+        cls.register_volleyball_markets()
+        cls.register_water_polo_markets()

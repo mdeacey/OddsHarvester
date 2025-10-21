@@ -190,6 +190,23 @@ class CLIArgumentValidator:
                 "ice-hockey",
                 "rugby-league",
                 "rugby-union",
+                # Add all new sports to support current season
+                "american-football",
+                "aussie-rules",
+                "badminton",
+                "bandy",
+                "boxing",
+                "cricket",
+                "darts",
+                "esports",
+                "floorball",
+                "futsal",
+                "handball",
+                "mma",
+                "snooker",
+                "table-tennis",
+                "volleyball",
+                "water-polo",
             }:
                 return errors
             errors.append(

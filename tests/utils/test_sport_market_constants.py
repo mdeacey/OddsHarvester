@@ -1,25 +1,51 @@
 from src.utils.sport_market_constants import (
+    AmericanFootballMarket,
+    AmericanFootballOverUnderMarket,
+    AussieRulesMarket,
+    AussieRulesOverUnderMarket,
+    BadmintonMarket,
+    BadmintonOverUnderMarket,
+    BandyMarket,
+    BandyOverUnderMarket,
     BaseballMarket,
     BaseballOverUnderMarket,
     BasketballAsianHandicapMarket,
     BasketballMarket,
     BasketballOverUnderMarket,
+    BoxingMarket,
+    CricketMarket,
+    CricketOverUnderMarket,
+    DartsMarket,
+    EsportsMarket,
+    FloorballMarket,
+    FloorballOverUnderMarket,
     FootballAsianHandicapMarket,
     FootballEuropeanHandicapMarket,
     FootballMarket,
     FootballOverUnderMarket,
+    FutsalMarket,
+    FutsalOverUnderMarket,
+    HandballMarket,
+    HandballOverUnderMarket,
     IceHockeyMarket,
     IceHockeyOverUnderMarket,
+    MmaMarket,
     RugbyHandicapMarket,
     RugbyLeagueMarket,
     RugbyOverUnderMarket,
     RugbyUnionMarket,
+    SnookerMarket,
     Sport,
+    TableTennisMarket,
     TennisAsianHandicapGamesMarket,
     TennisAsianHandicapSetsMarket,
     TennisMarket,
     TennisOverUnderGamesMarket,
     TennisOverUnderSetsMarket,
+    VolleyballMarket,
+    VolleyballOverUnderMarket,
+    WaterPoloMarket,
+    WaterPoloOverUnderMarket,
 )
 
 
@@ -33,6 +59,8 @@ class TestSportEnums:
 
         # Assert
         assert len(sport_values) == len(set(sport_values))  # Check uniqueness
+
+        # Test original sports are still there
         assert "football" in sport_values
         assert "tennis" in sport_values
         assert "basketball" in sport_values
@@ -40,6 +68,27 @@ class TestSportEnums:
         assert "rugby-union" in sport_values
         assert "ice-hockey" in sport_values
         assert "baseball" in sport_values
+
+        # Test new sports have been added
+        assert "american-football" in sport_values
+        assert "aussie-rules" in sport_values
+        assert "badminton" in sport_values
+        assert "bandy" in sport_values
+        assert "boxing" in sport_values
+        assert "cricket" in sport_values
+        assert "darts" in sport_values
+        assert "esports" in sport_values
+        assert "floorball" in sport_values
+        assert "futsal" in sport_values
+        assert "handball" in sport_values
+        assert "mma" in sport_values
+        assert "snooker" in sport_values
+        assert "table-tennis" in sport_values
+        assert "volleyball" in sport_values
+        assert "water-polo" in sport_values
+
+        # Assert total count is correct (7 original + 16 new = 23)
+        assert len(sport_values) == 23
 
     def test_football_market_enum(self):
         """Verify football markets."""
@@ -146,3 +195,40 @@ class TestSportEnums:
         assert "1x2" in market_values
         assert "home_away" in market_values
         assert "over_under_8_5" in over_under_values
+
+    def test_new_sports_market_enums(self):
+        """Verify market enums for key new sports."""
+        # American Football
+        af_markets = [market.value for market in AmericanFootballMarket]
+        af_over_under = [market.value for market in AmericanFootballOverUnderMarket]
+        assert "1x2" in af_markets
+        assert "home_away" in af_markets
+        assert "point_spread" in af_markets
+        assert "over_under_45_5" in af_over_under
+
+        # Cricket
+        cricket_markets = [market.value for market in CricketMarket]
+        cricket_over_under = [market.value for market in CricketOverUnderMarket]
+        assert "match_winner" in cricket_markets
+        assert "over_under_200_5" in cricket_over_under
+
+        # Handball
+        handball_markets = [market.value for market in HandballMarket]
+        handball_over_under = [market.value for market in HandballOverUnderMarket]
+        assert "1x2" in handball_markets
+        assert "home_away" in handball_markets
+        assert "over_under_60_5" in handball_over_under
+
+        # Volleyball
+        volleyball_markets = [market.value for market in VolleyballMarket]
+        volleyball_over_under = [market.value for market in VolleyballOverUnderMarket]
+        assert "1x2" in volleyball_markets
+        assert "home_away" in volleyball_markets
+        assert "over_under_200_5" in volleyball_over_under
+
+        # Individual sports (only match winner markets)
+        individual_sports = [BoxingMarket, DartsMarket, EsportsMarket, MmaMarket, SnookerMarket, TableTennisMarket]
+        for sport_market in individual_sports:
+            market_values = [market.value for market in sport_market]
+            assert "match_winner" in market_values
+            assert len(market_values) == 1

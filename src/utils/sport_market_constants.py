@@ -11,6 +11,22 @@ class Sport(Enum):
     RUGBY_UNION = "rugby-union"
     ICE_HOCKEY = "ice-hockey"
     BASEBALL = "baseball"
+    AMERICAN_FOOTBALL = "american-football"
+    AUSSIE_RULES = "aussie-rules"
+    BADMINTON = "badminton"
+    BANDY = "bandy"
+    BOXING = "boxing"
+    CRICKET = "cricket"
+    DARTS = "darts"
+    ESPORTS = "esports"
+    FLOORBALL = "floorball"
+    FUTSAL = "futsal"
+    HANDBALL = "handball"
+    MMA = "mma"
+    SNOOKER = "snooker"
+    TABLE_TENNIS = "table-tennis"
+    VOLLEYBALL = "volleyball"
+    WATER_POLO = "water-polo"
 
 
 class FootballMarket(Enum):
@@ -553,3 +569,305 @@ class IceHockeyOverUnderMarket(Enum):
     OVER_UNDER_9_5 = "over_under_9_5"
     OVER_UNDER_10_5 = "over_under_10_5"
     OVER_UNDER_11_5 = "over_under_11_5"
+
+
+# New Sports Market Enums
+
+class AmericanFootballMarket(Enum):
+    """American Football-specific markets."""
+
+    ONE_X_TWO = "1x2"
+    HOME_AWAY = "home_away"
+    POINT_SPREAD = "point_spread"
+
+
+class AmericanFootballOverUnderMarket(Enum):
+    """Over/Under market values for American football."""
+
+    OVER_UNDER_30_5 = "over_under_30_5"
+    OVER_UNDER_31_5 = "over_under_31_5"
+    OVER_UNDER_32_5 = "over_under_32_5"
+    OVER_UNDER_33_5 = "over_under_33_5"
+    OVER_UNDER_34_5 = "over_under_34_5"
+    OVER_UNDER_35_5 = "over_under_35_5"
+    OVER_UNDER_36_5 = "over_under_36_5"
+    OVER_UNDER_37_5 = "over_under_37_5"
+    OVER_UNDER_38_5 = "over_under_38_5"
+    OVER_UNDER_39_5 = "over_under_39_5"
+    OVER_UNDER_40_5 = "over_under_40_5"
+    OVER_UNDER_41_5 = "over_under_41_5"
+    OVER_UNDER_42_5 = "over_under_42_5"
+    OVER_UNDER_43_5 = "over_under_43_5"
+    OVER_UNDER_44_5 = "over_under_44_5"
+    OVER_UNDER_45_5 = "over_under_45_5"
+    OVER_UNDER_46_5 = "over_under_46_5"
+    OVER_UNDER_47_5 = "over_under_47_5"
+    OVER_UNDER_48_5 = "over_under_48_5"
+    OVER_UNDER_49_5 = "over_under_49_5"
+    OVER_UNDER_50_5 = "over_under_50_5"
+    OVER_UNDER_51_5 = "over_under_51_5"
+    OVER_UNDER_52_5 = "over_under_52_5"
+    OVER_UNDER_53_5 = "over_under_53_5"
+    OVER_UNDER_54_5 = "over_under_54_5"
+    OVER_UNDER_55_5 = "over_under_55_5"
+    OVER_UNDER_56_5 = "over_under_56_5"
+    OVER_UNDER_57_5 = "over_under_57_5"
+    OVER_UNDER_58_5 = "over_under_58_5"
+    OVER_UNDER_59_5 = "over_under_59_5"
+    OVER_UNDER_60_5 = "over_under_60_5"
+
+
+class AussieRulesMarket(Enum):
+    """Aussie Rules-specific markets."""
+
+    ONE_X_TWO = "1x2"
+    HOME_AWAY = "home_away"
+    HANDICAP = "handicap"
+
+
+class AussieRulesOverUnderMarket(Enum):
+    """Over/Under market values for Aussie Rules."""
+
+    OVER_UNDER_150_5 = "over_under_150_5"
+    OVER_UNDER_151_5 = "over_under_151_5"
+    OVER_UNDER_152_5 = "over_under_152_5"
+    OVER_UNDER_153_5 = "over_under_153_5"
+    OVER_UNDER_154_5 = "over_under_154_5"
+    OVER_UNDER_155_5 = "over_under_155_5"
+    OVER_UNDER_156_5 = "over_under_156_5"
+    OVER_UNDER_157_5 = "over_under_157_5"
+    OVER_UNDER_158_5 = "over_under_158_5"
+    OVER_UNDER_159_5 = "over_under_159_5"
+    OVER_UNDER_160_5 = "over_under_160_5"
+    OVER_UNDER_161_5 = "over_under_161_5"
+    OVER_UNDER_162_5 = "over_under_162_5"
+    OVER_UNDER_163_5 = "over_under_163_5"
+    OVER_UNDER_164_5 = "over_under_164_5"
+    OVER_UNDER_165_5 = "over_under_165_5"
+    OVER_UNDER_166_5 = "over_under_166_5"
+    OVER_UNDER_167_5 = "over_under_167_5"
+    OVER_UNDER_168_5 = "over_under_168_5"
+    OVER_UNDER_169_5 = "over_under_169_5"
+    OVER_UNDER_170_5 = "over_under_170_5"
+
+
+class BadmintonMarket(Enum):
+    """Badminton-specific markets."""
+
+    MATCH_WINNER = "match_winner"
+
+
+class BadmintonOverUnderMarket(Enum):
+    """Over/Under market values for badminton."""
+
+    OVER_UNDER_30_5 = "over_under_30_5"
+    OVER_UNDER_31_5 = "over_under_31_5"
+    OVER_UNDER_32_5 = "over_under_32_5"
+    OVER_UNDER_33_5 = "over_under_33_5"
+    OVER_UNDER_34_5 = "over_under_34_5"
+    OVER_UNDER_35_5 = "over_under_35_5"
+    OVER_UNDER_36_5 = "over_under_36_5"
+    OVER_UNDER_37_5 = "over_under_37_5"
+    OVER_UNDER_38_5 = "over_under_38_5"
+    OVER_UNDER_39_5 = "over_under_39_5"
+    OVER_UNDER_40_5 = "over_under_40_5"
+    OVER_UNDER_41_5 = "over_under_41_5"
+    OVER_UNDER_42_5 = "over_under_42_5"
+    OVER_UNDER_43_5 = "over_under_43_5"
+    OVER_UNDER_44_5 = "over_under_44_5"
+    OVER_UNDER_45_5 = "over_under_45_5"
+
+
+class BandyMarket(Enum):
+    """Bandy-specific markets."""
+
+    ONE_X_TWO = "1x2"
+    HOME_AWAY = "home_away"
+
+
+class BandyOverUnderMarket(Enum):
+    """Over/Under market values for bandy."""
+
+    OVER_UNDER_5_5 = "over_under_5_5"
+    OVER_UNDER_6_5 = "over_under_6_5"
+    OVER_UNDER_7_5 = "over_under_7_5"
+    OVER_UNDER_8_5 = "over_under_8_5"
+    OVER_UNDER_9_5 = "over_under_9_5"
+    OVER_UNDER_10_5 = "over_under_10_5"
+    OVER_UNDER_11_5 = "over_under_11_5"
+    OVER_UNDER_12_5 = "over_under_12_5"
+
+
+class BoxingMarket(Enum):
+    """Boxing-specific markets."""
+
+    MATCH_WINNER = "match_winner"
+
+
+class CricketMarket(Enum):
+    """Cricket-specific markets."""
+
+    MATCH_WINNER = "match_winner"
+
+
+class CricketOverUnderMarket(Enum):
+    """Over/Under market values for cricket."""
+
+    OVER_UNDER_150_5 = "over_under_150_5"
+    OVER_UNDER_160_5 = "over_under_160_5"
+    OVER_UNDER_170_5 = "over_under_170_5"
+    OVER_UNDER_180_5 = "over_under_180_5"
+    OVER_UNDER_190_5 = "over_under_190_5"
+    OVER_UNDER_200_5 = "over_under_200_5"
+    OVER_UNDER_210_5 = "over_under_210_5"
+    OVER_UNDER_220_5 = "over_under_220_5"
+    OVER_UNDER_230_5 = "over_under_230_5"
+    OVER_UNDER_240_5 = "over_under_240_5"
+    OVER_UNDER_250_5 = "over_under_250_5"
+
+
+class DartsMarket(Enum):
+    """Darts-specific markets."""
+
+    MATCH_WINNER = "match_winner"
+
+
+class EsportsMarket(Enum):
+    """Esports-specific markets."""
+
+    MATCH_WINNER = "match_winner"
+
+
+class FloorballMarket(Enum):
+    """Floorball-specific markets."""
+
+    ONE_X_TWO = "1x2"
+    HOME_AWAY = "home_away"
+
+
+class FloorballOverUnderMarket(Enum):
+    """Over/Under market values for floorball."""
+
+    OVER_UNDER_5_5 = "over_under_5_5"
+    OVER_UNDER_6_5 = "over_under_6_5"
+    OVER_UNDER_7_5 = "over_under_7_5"
+    OVER_UNDER_8_5 = "over_under_8_5"
+    OVER_UNDER_9_5 = "over_under_9_5"
+    OVER_UNDER_10_5 = "over_under_10_5"
+
+
+class FutsalMarket(Enum):
+    """Futsal-specific markets."""
+
+    ONE_X_TWO = "1x2"
+    HOME_AWAY = "home_away"
+
+
+class FutsalOverUnderMarket(Enum):
+    """Over/Under market values for futsal."""
+
+    OVER_UNDER_3_5 = "over_under_3_5"
+    OVER_UNDER_4_5 = "over_under_4_5"
+    OVER_UNDER_5_5 = "over_under_5_5"
+    OVER_UNDER_6_5 = "over_under_6_5"
+    OVER_UNDER_7_5 = "over_under_7_5"
+    OVER_UNDER_8_5 = "over_under_8_5"
+    OVER_UNDER_9_5 = "over_under_9_5"
+    OVER_UNDER_10_5 = "over_under_10_5"
+
+
+class HandballMarket(Enum):
+    """Handball-specific markets."""
+
+    ONE_X_TWO = "1x2"
+    HOME_AWAY = "home_away"
+
+
+class HandballOverUnderMarket(Enum):
+    """Over/Under market values for handball."""
+
+    OVER_UNDER_50_5 = "over_under_50_5"
+    OVER_UNDER_51_5 = "over_under_51_5"
+    OVER_UNDER_52_5 = "over_under_52_5"
+    OVER_UNDER_53_5 = "over_under_53_5"
+    OVER_UNDER_54_5 = "over_under_54_5"
+    OVER_UNDER_55_5 = "over_under_55_5"
+    OVER_UNDER_56_5 = "over_under_56_5"
+    OVER_UNDER_57_5 = "over_under_57_5"
+    OVER_UNDER_58_5 = "over_under_58_5"
+    OVER_UNDER_59_5 = "over_under_59_5"
+    OVER_UNDER_60_5 = "over_under_60_5"
+    OVER_UNDER_61_5 = "over_under_61_5"
+    OVER_UNDER_62_5 = "over_under_62_5"
+    OVER_UNDER_63_5 = "over_under_63_5"
+    OVER_UNDER_64_5 = "over_under_64_5"
+    OVER_UNDER_65_5 = "over_under_65_5"
+    OVER_UNDER_66_5 = "over_under_66_5"
+    OVER_UNDER_67_5 = "over_under_67_5"
+    OVER_UNDER_68_5 = "over_under_68_5"
+    OVER_UNDER_69_5 = "over_under_69_5"
+    OVER_UNDER_70_5 = "over_under_70_5"
+
+
+class MmaMarket(Enum):
+    """MMA-specific markets."""
+
+    MATCH_WINNER = "match_winner"
+
+
+class SnookerMarket(Enum):
+    """Snooker-specific markets."""
+
+    MATCH_WINNER = "match_winner"
+
+
+class TableTennisMarket(Enum):
+    """Table Tennis-specific markets."""
+
+    MATCH_WINNER = "match_winner"
+
+
+class VolleyballMarket(Enum):
+    """Volleyball-specific markets."""
+
+    ONE_X_TWO = "1x2"
+    HOME_AWAY = "home_away"
+
+
+class VolleyballOverUnderMarket(Enum):
+    """Over/Under market values for volleyball."""
+
+    OVER_UNDER_150_5 = "over_under_150_5"
+    OVER_UNDER_160_5 = "over_under_160_5"
+    OVER_UNDER_170_5 = "over_under_170_5"
+    OVER_UNDER_180_5 = "over_under_180_5"
+    OVER_UNDER_190_5 = "over_under_190_5"
+    OVER_UNDER_200_5 = "over_under_200_5"
+    OVER_UNDER_210_5 = "over_under_210_5"
+    OVER_UNDER_220_5 = "over_under_220_5"
+    OVER_UNDER_230_5 = "over_under_230_5"
+    OVER_UNDER_240_5 = "over_under_240_5"
+    OVER_UNDER_250_5 = "over_under_250_5"
+
+
+class WaterPoloMarket(Enum):
+    """Water Polo-specific markets."""
+
+    ONE_X_TWO = "1x2"
+    HOME_AWAY = "home_away"
+
+
+class WaterPoloOverUnderMarket(Enum):
+    """Over/Under market values for water polo."""
+
+    OVER_UNDER_15_5 = "over_under_15_5"
+    OVER_UNDER_16_5 = "over_under_16_5"
+    OVER_UNDER_17_5 = "over_under_17_5"
+    OVER_UNDER_18_5 = "over_under_18_5"
+    OVER_UNDER_19_5 = "over_under_19_5"
+    OVER_UNDER_20_5 = "over_under_20_5"
+    OVER_UNDER_21_5 = "over_under_21_5"
+    OVER_UNDER_22_5 = "over_under_22_5"
+    OVER_UNDER_23_5 = "over_under_23_5"
+    OVER_UNDER_24_5 = "over_under_24_5"
+    OVER_UNDER_25_5 = "over_under_25_5"

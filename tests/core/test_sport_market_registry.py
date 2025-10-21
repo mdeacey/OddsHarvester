@@ -235,6 +235,66 @@ class TestSportMarketRegistrar:
         # Over/Under markets
         assert "over_under_7_5" in baseball_markets
 
+    def test_register_american_football_markets(self):
+        """Test registering markets for American football."""
+        # Act
+        SportMarketRegistrar.register_american_football_markets()
+
+        # Assert
+        af_markets = SportMarketRegistry.get_market_mapping(Sport.AMERICAN_FOOTBALL.value)
+
+        # Basic markets
+        assert "1x2" in af_markets
+        assert "home_away" in af_markets
+        assert "point_spread" in af_markets
+
+        # Over/Under markets
+        assert any(key.startswith("over_under_") for key in af_markets)
+
+    def test_register_cricket_markets(self):
+        """Test registering markets for cricket."""
+        # Act
+        SportMarketRegistrar.register_cricket_markets()
+
+        # Assert
+        cricket_markets = SportMarketRegistry.get_market_mapping(Sport.CRICKET.value)
+
+        # Basic markets
+        assert "match_winner" in cricket_markets
+
+        # Over/Under markets
+        assert any(key.startswith("over_under_") for key in cricket_markets)
+
+    def test_register_handball_markets(self):
+        """Test registering markets for handball."""
+        # Act
+        SportMarketRegistrar.register_handball_markets()
+
+        # Assert
+        handball_markets = SportMarketRegistry.get_market_mapping(Sport.HANDBALL.value)
+
+        # Basic markets
+        assert "1x2" in handball_markets
+        assert "home_away" in handball_markets
+
+        # Over/Under markets
+        assert any(key.startswith("over_under_") for key in handball_markets)
+
+    def test_register_volleyball_markets(self):
+        """Test registering markets for volleyball."""
+        # Act
+        SportMarketRegistrar.register_volleyball_markets()
+
+        # Assert
+        volleyball_markets = SportMarketRegistry.get_market_mapping(Sport.VOLLEYBALL.value)
+
+        # Basic markets
+        assert "1x2" in volleyball_markets
+        assert "home_away" in volleyball_markets
+
+        # Over/Under markets
+        assert any(key.startswith("over_under_") for key in volleyball_markets)
+
     def test_register_all_markets(self):
         """Test registering all markets for all sports."""
         # Act
@@ -245,9 +305,12 @@ class TestSportMarketRegistrar:
                         with patch.object(SportMarketRegistrar, "register_rugby_union_markets") as mock_rugby_union:
                             with patch.object(SportMarketRegistrar, "register_ice_hockey_markets") as mock_ice_hockey:
                                 with patch.object(SportMarketRegistrar, "register_baseball_markets") as mock_baseball:
-                                    SportMarketRegistrar.register_all_markets()
+                                    with patch.object(SportMarketRegistrar, "register_american_football_markets") as mock_american_football:
+                                        with patch.object(SportMarketRegistrar, "register_cricket_markets") as mock_cricket:
+                                            with patch.object(SportMarketRegistrar, "register_volleyball_markets") as mock_volleyball:
+                                                SportMarketRegistrar.register_all_markets()
 
-        # Assert
+        # Assert - test original sports
         mock_football.assert_called_once()
         mock_tennis.assert_called_once()
         mock_basketball.assert_called_once()
@@ -255,6 +318,11 @@ class TestSportMarketRegistrar:
         mock_rugby_union.assert_called_once()
         mock_ice_hockey.assert_called_once()
         mock_baseball.assert_called_once()
+
+        # Assert - test key new sports are called (not all 16 to keep test manageable)
+        mock_american_football.assert_called_once()
+        mock_cricket.assert_called_once()
+        mock_volleyball.assert_called_once()
 
     def test_register_all_markets_integration(self):
         """Test registering all markets in an integration test"""

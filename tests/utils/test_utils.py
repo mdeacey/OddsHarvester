@@ -3,32 +3,59 @@ from unittest.mock import patch
 import pytest
 
 from src.utils.sport_market_constants import (
+    AmericanFootballMarket,
+    AmericanFootballOverUnderMarket,
+    AussieRulesMarket,
+    AussieRulesOverUnderMarket,
+    BadmintonMarket,
+    BadmintonOverUnderMarket,
+    BandyMarket,
+    BandyOverUnderMarket,
     BaseballMarket,
     BaseballOverUnderMarket,
     BasketballAsianHandicapMarket,
     BasketballMarket,
     BasketballOverUnderMarket,
+    BoxingMarket,
+    CricketMarket,
+    CricketOverUnderMarket,
+    DartsMarket,
+    EsportsMarket,
+    FloorballMarket,
+    FloorballOverUnderMarket,
     FootballAsianHandicapMarket,
     FootballEuropeanHandicapMarket,
     FootballMarket,
     FootballOverUnderMarket,
+    FutsalMarket,
+    FutsalOverUnderMarket,
+    HandballMarket,
+    HandballOverUnderMarket,
     IceHockeyMarket,
     IceHockeyOverUnderMarket,
+    MmaMarket,
     RugbyHandicapMarket,
     RugbyLeagueMarket,
     RugbyOverUnderMarket,
     RugbyUnionMarket,
+    SnookerMarket,
     Sport,
+    TableTennisMarket,
     TennisAsianHandicapGamesMarket,
     TennisAsianHandicapSetsMarket,
     TennisCorrectScoreMarket,
     TennisMarket,
     TennisOverUnderGamesMarket,
     TennisOverUnderSetsMarket,
+    VolleyballMarket,
+    VolleyballOverUnderMarket,
+    WaterPoloMarket,
+    WaterPoloOverUnderMarket,
 )
 from src.utils.utils import clean_html_text, get_supported_markets, is_running_in_docker
 
 EXPECTED_MARKETS = {
+    # Original sports
     Sport.FOOTBALL: [
         *[market.value for market in FootballMarket],
         *[market.value for market in FootballOverUnderMarket],
@@ -66,12 +93,72 @@ EXPECTED_MARKETS = {
         *[market.value for market in BaseballMarket],
         *[market.value for market in BaseballOverUnderMarket],
     ],
+    # New sports
+    Sport.AMERICAN_FOOTBALL: [
+        *[market.value for market in AmericanFootballMarket],
+        *[market.value for market in AmericanFootballOverUnderMarket],
+    ],
+    Sport.AUSSIE_RULES: [
+        *[market.value for market in AussieRulesMarket],
+        *[market.value for market in AussieRulesOverUnderMarket],
+    ],
+    Sport.BADMINTON: [
+        *[market.value for market in BadmintonMarket],
+        *[market.value for market in BadmintonOverUnderMarket],
+    ],
+    Sport.BANDY: [
+        *[market.value for market in BandyMarket],
+        *[market.value for market in BandyOverUnderMarket],
+    ],
+    Sport.BOXING: [
+        *[market.value for market in BoxingMarket],
+    ],
+    Sport.CRICKET: [
+        *[market.value for market in CricketMarket],
+        *[market.value for market in CricketOverUnderMarket],
+    ],
+    Sport.DARTS: [
+        *[market.value for market in DartsMarket],
+    ],
+    Sport.ESPORTS: [
+        *[market.value for market in EsportsMarket],
+    ],
+    Sport.FLOORBALL: [
+        *[market.value for market in FloorballMarket],
+        *[market.value for market in FloorballOverUnderMarket],
+    ],
+    Sport.FUTSAL: [
+        *[market.value for market in FutsalMarket],
+        *[market.value for market in FutsalOverUnderMarket],
+    ],
+    Sport.HANDBALL: [
+        *[market.value for market in HandballMarket],
+        *[market.value for market in HandballOverUnderMarket],
+    ],
+    Sport.MMA: [
+        *[market.value for market in MmaMarket],
+    ],
+    Sport.SNOOKER: [
+        *[market.value for market in SnookerMarket],
+    ],
+    Sport.TABLE_TENNIS: [
+        *[market.value for market in TableTennisMarket],
+    ],
+    Sport.VOLLEYBALL: [
+        *[market.value for market in VolleyballMarket],
+        *[market.value for market in VolleyballOverUnderMarket],
+    ],
+    Sport.WATER_POLO: [
+        *[market.value for market in WaterPoloMarket],
+        *[market.value for market in WaterPoloOverUnderMarket],
+    ],
 }
 
 
 @pytest.mark.parametrize(
     ("sport_enum", "expected"),
     [
+        # Original sports
         (Sport.FOOTBALL, EXPECTED_MARKETS[Sport.FOOTBALL]),
         (Sport.TENNIS, EXPECTED_MARKETS[Sport.TENNIS]),
         (Sport.BASKETBALL, EXPECTED_MARKETS[Sport.BASKETBALL]),
@@ -79,6 +166,23 @@ EXPECTED_MARKETS = {
         (Sport.RUGBY_UNION, EXPECTED_MARKETS[Sport.RUGBY_UNION]),
         (Sport.ICE_HOCKEY, EXPECTED_MARKETS[Sport.ICE_HOCKEY]),
         (Sport.BASEBALL, EXPECTED_MARKETS[Sport.BASEBALL]),
+        # New sports
+        (Sport.AMERICAN_FOOTBALL, EXPECTED_MARKETS[Sport.AMERICAN_FOOTBALL]),
+        (Sport.AUSSIE_RULES, EXPECTED_MARKETS[Sport.AUSSIE_RULES]),
+        (Sport.BADMINTON, EXPECTED_MARKETS[Sport.BADMINTON]),
+        (Sport.BANDY, EXPECTED_MARKETS[Sport.BANDY]),
+        (Sport.BOXING, EXPECTED_MARKETS[Sport.BOXING]),
+        (Sport.CRICKET, EXPECTED_MARKETS[Sport.CRICKET]),
+        (Sport.DARTS, EXPECTED_MARKETS[Sport.DARTS]),
+        (Sport.ESPORTS, EXPECTED_MARKETS[Sport.ESPORTS]),
+        (Sport.FLOORBALL, EXPECTED_MARKETS[Sport.FLOORBALL]),
+        (Sport.FUTSAL, EXPECTED_MARKETS[Sport.FUTSAL]),
+        (Sport.HANDBALL, EXPECTED_MARKETS[Sport.HANDBALL]),
+        (Sport.MMA, EXPECTED_MARKETS[Sport.MMA]),
+        (Sport.SNOOKER, EXPECTED_MARKETS[Sport.SNOOKER]),
+        (Sport.TABLE_TENNIS, EXPECTED_MARKETS[Sport.TABLE_TENNIS]),
+        (Sport.VOLLEYBALL, EXPECTED_MARKETS[Sport.VOLLEYBALL]),
+        (Sport.WATER_POLO, EXPECTED_MARKETS[Sport.WATER_POLO]),
     ],
 )
 def test_get_supported_markets_enum(sport_enum, expected):
@@ -89,6 +193,7 @@ def test_get_supported_markets_enum(sport_enum, expected):
 @pytest.mark.parametrize(
     ("sport_str", "expected"),
     [
+        # Original sports
         ("football", EXPECTED_MARKETS[Sport.FOOTBALL]),
         ("tennis", EXPECTED_MARKETS[Sport.TENNIS]),
         ("basketball", EXPECTED_MARKETS[Sport.BASKETBALL]),
@@ -96,6 +201,13 @@ def test_get_supported_markets_enum(sport_enum, expected):
         ("rugby-union", EXPECTED_MARKETS[Sport.RUGBY_UNION]),
         ("ice-hockey", EXPECTED_MARKETS[Sport.ICE_HOCKEY]),
         ("baseball", EXPECTED_MARKETS[Sport.BASEBALL]),
+        # New sports - sample testing (not all 16 to keep test file manageable)
+        ("american-football", EXPECTED_MARKETS[Sport.AMERICAN_FOOTBALL]),
+        ("cricket", EXPECTED_MARKETS[Sport.CRICKET]),
+        ("volleyball", EXPECTED_MARKETS[Sport.VOLLEYBALL]),
+        ("handball", EXPECTED_MARKETS[Sport.HANDBALL]),
+        ("mma", EXPECTED_MARKETS[Sport.MMA]),
+        ("esports", EXPECTED_MARKETS[Sport.ESPORTS]),
     ],
 )
 def test_get_supported_markets_string(sport_str, expected):
