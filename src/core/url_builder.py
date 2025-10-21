@@ -1,6 +1,12 @@
 import re
+from datetime import datetime
+from typing import List, Tuple
 
 from src.utils.constants import ODDSPORTAL_BASE_URL
+from src.utils.date_utils import (
+    parse_flexible_date, generate_date_range, generate_month_range,
+    generate_year_range, format_date_for_oddsportal
+)
 from src.utils.sport_league_constants import SPORTS_LEAGUES_URLS_MAPPING
 from src.utils.sport_market_constants import Sport
 
@@ -100,3 +106,116 @@ class URLBuilder:
             raise ValueError(f"Invalid league '{league}' for sport '{sport}'. Available: {', '.join(leagues.keys())}")
 
         return leagues[league]
+
+    @staticmethod
+    def get_upcoming_matches_urls_for_range(sport: str, from_date: str, to_date: str, league: str | None = None) -> List[Tuple[str, str]]:
+        """
+        Constructs URLs for upcoming matches across a date range.
+
+        Args:
+            sport (str): The sport for which URLs are required
+            from_date (str): Start date in flexible format (YYYYMMDD, YYYYMM, YYYY, or 'now')
+            to_date (str): End date in flexible format (YYYYMMDD, YYYYMM, YYYY, or 'now')
+            league (Optional[str]): Specific league to filter by
+
+        Returns:
+            List[Tuple[str, str]]: List of (url, date_string) tuples for each date in the range
+
+        Raises:
+            ValueError: If date formats are invalid
+        """
+        try:
+            start_date = parse_flexible_date(from_date)
+            end_date = parse_flexible_date(to_date)
+        except ValueError as e:
+            raise ValueError(f"Invalid date format: {e}")
+
+        if end_date < start_date:
+            raise ValueError("End date cannot be before start date")
+
+        urls = []
+        dates = generate_date_range(start_date, end_date)
+
+        for date_obj in dates:
+            date_str = format_date_for_oddsportal(date_obj)
+            url = URLBuilder.get_upcoming_matches_url(sport, date_str, league)
+            urls.append((url, date_str))
+
+        return urls
+
+    @staticmethod
+    def get_historic_matches_urls_for_range(sport: str, from_date: str, to_date: str, league: str) -> List[Tuple[str, str]]:
+        """
+        Constructs URLs for historical matches across a season/year range.
+
+        Args:
+            sport (str): The sport for which URLs are required
+            from_date (str): Start season/year in format YYYY, YYYY-YYYY, or 'now'
+            to_date (str): End season/year in format YYYY, YYYY-YYYY, or 'now'
+            league (str): The league to scrape
+
+        Returns:
+            List[Tuple[str, str]]: List of (url, season_string) tuples for each season in the range
+
+        Raises:
+            ValueError: If season formats are invalid
+        """
+        try:
+            start_season_data = URLBuilder._parse_season_for_url(from_date)
+            end_season_data = URLBuilder._parse_season_for_url(to_date)
+        except ValueError as e:
+            raise ValueError(f"Invalid season format: {e}")
+
+        start_year = start_season_data[1]
+        end_year = end_season_data[1]
+
+        if end_year < start_year:
+            raise ValueError("End season/year cannot be before start season/year")
+
+        urls = []
+        # For historical data, we generate years from start_year to end_year (inclusive)
+        for year in range(start_year, end_year + 1):
+            season_str = str(year)  # For historical, we use single year format
+            url = URLBuilder.get_historic_matches_url(sport, league, season_str)
+            urls.append((url, season_str))
+
+        return urls
+
+    @staticmethod
+    def _parse_season_for_url(season_str: str | int) -> Tuple[str, int]:
+        """
+        Parse season string for URL generation and return (season_format, end_year).
+
+        Args:
+            season_str: Season string in YYYY, YYYY-YYYY, or 'now' format, or integer year
+
+        Returns:
+            Tuple of (season_format, end_year) where season_format is the string to use in URLs
+        """
+        # Handle integer input
+        if isinstance(season_str, int):
+            return str(season_str), season_str
+
+        season_str = season_str.strip().lower()
+
+        if season_str == "now":
+            current_year = datetime.now().year
+            return str(current_year), current_year
+
+        # YYYY format
+        if re.match(r"^\d{4}$", season_str):
+            year = int(season_str)
+            return season_str, year
+
+        # YYYY-YYYY format
+        if re.match(r"^\d{4}-\d{4}$", season_str):
+            start_year, end_year = map(int, season_str.split("-"))
+            if end_year != start_year + 1:
+                raise ValueError(
+                    f"Invalid season range: '{season_str}'. The second year must be exactly one year after the first year."
+                )
+            return season_str, end_year
+
+        raise ValueError(
+            f"Invalid season format: '{season_str}'. Expected format: YYYY, YYYY-YYYY, or 'now' (e.g., 2023, 2022-2023, now)."
+        )

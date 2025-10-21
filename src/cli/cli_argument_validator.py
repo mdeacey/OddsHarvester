@@ -5,6 +5,10 @@ import re
 from src.storage.storage_format import StorageFormat
 from src.storage.storage_type import StorageType
 from src.utils.command_enum import CommandEnum
+from src.utils.date_utils import (
+    parse_flexible_date, get_date_granularity, validate_date_range,
+    validate_season_range, normalize_season
+)
 from src.utils.odds_format_enum import OddsFormat
 from src.utils.sport_league_constants import SPORTS_LEAGUES_URLS_MAPPING
 from src.utils.sport_market_constants import Sport
@@ -36,14 +40,12 @@ class CLIArgumentValidator:
         if hasattr(args, "leagues"):
             errors.extend(self._validate_leagues(sport=args.sport, leagues=args.leagues))
 
-        if hasattr(args, "season"):
-            errors.extend(self._validate_season(command=args.command, season=args.season, sport=args.sport))
-
-        if hasattr(args, "date"):
+        if hasattr(args, "from_date") and hasattr(args, "to_date"):
             errors.extend(
-                self._validate_date(
+                self._validate_date_range(
                     command=args.command,
-                    date=args.date,
+                    from_date=args.from_date,
+                    to_date=args.to_date,
                     match_links=args.match_links,
                     leagues=getattr(args, "leagues", None),
                 )
@@ -171,102 +173,132 @@ class CLIArgumentValidator:
 
         return errors
 
-    def _validate_season(self, command: str, season: str | None, sport: str | None = None) -> list[str]:
-        """Validates the season argument (only for scrape_historic command)."""
-        errors = []
-
-        if command != "scrape_historic":
-            return errors  # Season validation is only for the historic command
-
-        if not season:
-            errors.append("The season argument is required for the 'scrape_historic' command.")
-            return errors
-
-        if isinstance(season, str) and season.lower() == "current":
-            if isinstance(sport, str) and sport.lower() in {
-                "tennis",
-                "football",
-                "baseball",
-                "ice-hockey",
-                "rugby-league",
-                "rugby-union",
-                # Add all new sports to support current season
-                "american-football",
-                "aussie-rules",
-                "badminton",
-                "bandy",
-                "boxing",
-                "cricket",
-                "darts",
-                "esports",
-                "floorball",
-                "futsal",
-                "handball",
-                "mma",
-                "snooker",
-                "table-tennis",
-                "volleyball",
-                "water-polo",
-            }:
-                return errors
-            errors.append(
-                f"Invalid season format: '{season}'. Expected format: YYYY or YYYY-YYYY (e.g., 2024 or 2024-2025)."
-            )
-            return errors
-
-        single_year_pattern = re.compile(r"^\d{4}$")
-        range_pattern = re.compile(r"^\d{4}-\d{4}$")
-
-        if single_year_pattern.match(season):
-            # Valid single year (e.g., 2024), no further checks needed
-            return errors
-
-        if range_pattern.match(season):
-            # Validate that the second year is exactly one after the first
-            start_year, end_year = map(int, season.split("-"))
-            if end_year != start_year + 1:
-                errors.append(
-                    f"Invalid season range: '{season}'. The second year must be exactly one year after the first year."
-                )
-        else:
-            errors.append(
-                f"Invalid season format: '{season}'. Expected format: YYYY or YYYY-YYYY (e.g., 2024 or 2024-2025)."
-            )
-
-        return errors
-
-    def _validate_date(
-        self, command: str, date: str | None, match_links: list[str] | None, leagues: list[str] | None = None
+    def _validate_date_range(
+        self, command: str, from_date: str | None, to_date: str | None, match_links: list[str] | None, leagues: list[str] | None = None
     ) -> list[str]:
-        """Validates the date argument for the `scrape_upcoming` command."""
+        """Validates the from/to date range arguments for both upcoming and historic commands."""
         errors = []
 
-        # Date not required when match_links or leagues is provided
+        # Date range not required when match_links or leagues is provided
         if match_links or leagues:
             return errors
 
-        # Date should only be required for scrape_upcoming
-        if command != "scrape_upcoming":
-            if date:
-                errors.append(f"Date should not be provided for the '{command}' command.")
+        if command == "scrape_upcoming":
+            return self._validate_upcoming_date_range(from_date, to_date)
+        elif command == "scrape_historic":
+            return self._validate_historic_date_range(from_date, to_date)
+        else:
+            # Date ranges shouldn't be provided for other commands
+            if from_date or to_date:
+                errors.append(f"Date ranges should not be provided for the '{command}' command.")
             return errors
 
-        if not date:
+    def _validate_upcoming_date_range(self, from_date: str | None, to_date: str | None) -> list[str]:
+        """Validates date range for upcoming matches."""
+        errors = []
+
+        if not from_date:
             return [
-                f"Missing required argument: 'date' is mandatory for '{command}' command when no leagues are specified."
+                "Missing required argument: '--from' is mandatory for 'scrape_upcoming' command when no leagues are specified."
             ]
 
-        # Ensure date format is YYYYMMDD
-        try:
-            parsed_date = datetime.strptime(date, "%Y%m%d")
-        except ValueError:
-            return [f"Invalid date format: '{date}'. Expected format is YYYYMMDD (e.g., 20250227)."]
+        # Default to_date to from_date if not provided
+        if not to_date:
+            to_date = from_date
 
-        # Ensure the date is today or in the future
-        if parsed_date.date() < datetime.now().date():
-            errors.append(f"Date '{date}' must be today or in the future.")
+        try:
+            start_date = parse_flexible_date(from_date)
+            end_date = parse_flexible_date(to_date)
+        except ValueError as e:
+            errors.append(str(e))
+            return errors
+
+        # Validate date range order
+        if end_date < start_date:
+            errors.append("--to date cannot be before --from date.")
+            return errors
+
+        # Validate that dates are not in the past for upcoming matches
+        if start_date.date() < datetime.now().date():
+            errors.append("--from date must be today or in the future for upcoming matches.")
+        elif end_date.date() < datetime.now().date():
+            errors.append("--to date must be today or in the future for upcoming matches.")
+
+        # Validate date range size (default 30 days max)
+        try:
+            validate_date_range(start_date, end_date, max_days=30)
+        except ValueError as e:
+            errors.append(str(e))
 
         return errors
+
+    def _validate_historic_date_range(self, from_date: str | None, to_date: str | None) -> list[str]:
+        """Validates season/year range for historical matches."""
+        errors = []
+
+        if not from_date:
+            return [
+                "Missing required argument: '--from' is mandatory for 'scrape_historic' command."
+            ]
+
+        # Default to_date to from_date if not provided
+        if not to_date:
+            to_date = from_date
+
+        # Validate season formats (YYYY or YYYY-YYYY)
+        try:
+            start_season = self._parse_season(from_date)
+            end_season = self._parse_season(to_date)
+        except ValueError as e:
+            errors.append(str(e))
+            return errors
+
+        # Validate season range order
+        if end_season[1] < start_season[1]:
+            errors.append("--to season/year cannot be before --from season/year.")
+            return errors
+
+        # Validate season range size (default 10 years max)
+        try:
+            validate_season_range(start_season[1], end_season[1], max_years=10)
+        except ValueError as e:
+            errors.append(str(e))
+
+        return errors
+
+    def _parse_season(self, season_str: str) -> tuple[str, int]:
+        """
+        Parse season string and return (season_format, end_year).
+
+        Args:
+            season_str: Season string in YYYY, YYYY-YYYY, or 'now' format
+
+        Returns:
+            Tuple of (season_format, end_year) where season_format is the string to use in URLs
+        """
+        season_str = season_str.strip().lower()
+
+        if season_str == "now":
+            current_year = datetime.now().year
+            return str(current_year), current_year
+
+        # YYYY format
+        if re.match(r"^\d{4}$", season_str):
+            year = int(season_str)
+            return season_str, year
+
+        # YYYY-YYYY format
+        if re.match(r"^\d{4}-\d{4}$", season_str):
+            start_year, end_year = map(int, season_str.split("-"))
+            if end_year != start_year + 1:
+                raise ValueError(
+                    f"Invalid season range: '{season_str}'. The second year must be exactly one year after the first year."
+                )
+            return season_str, end_year
+
+        raise ValueError(
+            f"Invalid season format: '{season_str}'. Expected format: YYYY, YYYY-YYYY, or 'now' (e.g., 2023, 2022-2023, now)."
+        )
 
     def _validate_storage(self, storage: str) -> list[str]:
         """Validates the storage argument."""

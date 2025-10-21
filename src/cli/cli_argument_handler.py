@@ -26,31 +26,17 @@ class CLIArgumentHandler:
             self.parser.print_help()
             exit(1)
 
-        # Normalize 'current' to None for allowed sports so URL builder targets current season
-        if (
-            args.command == "scrape_historic"
-            and isinstance(args.season, str)
-            and args.season.lower() == "current"
-            and isinstance(args.sport, str)
-            and args.sport.lower()
-            in {
-                "tennis",
-                "football",
-                "baseball",
-                "ice-hockey",
-                "rugby-league",
-                "rugby-union",
-            }
-        ):
-            args.season = None
+        # Normalize 'now' to current date/season handling
+        from src.utils.date_utils import parse_flexible_date
+        from datetime import datetime
 
         return {
             "command": args.command,
             "match_links": getattr(args, "match_links", None),
             "sport": getattr(args, "sport", None),
-            "date": getattr(args, "date", None),
+            "from_date": getattr(args, "from_date", None),
+            "to_date": getattr(args, "to_date", None),
             "leagues": getattr(args, "leagues", None),
-            "season": getattr(args, "season", None),
             "storage_type": args.storage,
             "storage_format": getattr(args, "format", None),
             "file_path": getattr(args, "file_path", None),

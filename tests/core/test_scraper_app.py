@@ -7,7 +7,10 @@ from src.core.browser_helper import BrowserHelper
 from src.core.odds_portal_market_extractor import OddsPortalMarketExtractor
 from src.core.odds_portal_scraper import OddsPortalScraper
 from src.core.playwright_manager import PlaywrightManager
-from src.core.scraper_app import TRANSIENT_ERRORS, _scrape_multiple_leagues, _scrape_all_sports, retry_scrape, run_scraper
+from src.core.scraper_app import (
+    TRANSIENT_ERRORS, _scrape_multiple_leagues, _scrape_all_sports, _scrape_all_sports_date_range,
+    _scrape_multiple_leagues_date_range, retry_scrape, run_scraper
+)
 from src.utils.command_enum import CommandEnum
 
 
@@ -62,7 +65,8 @@ async def test_run_scraper_historic(
         command=CommandEnum.HISTORIC,
         sport="football",
         leagues=["premier-league"],
-        season="2023",
+        from_date="2023",
+        to_date="2023",
         markets=["1x2", "over_under"],
         max_pages=2,
         headless=True,
@@ -119,7 +123,8 @@ async def test_run_scraper_upcoming(
     result = await run_scraper(
         command=CommandEnum.UPCOMING_MATCHES,
         sport="basketball",
-        date="2023-06-01",
+        from_date="20230601",
+        to_date="20230601",
         leagues=["nba"],
         markets=["1x2"],
         browser_user_agent="custom-agent",
@@ -138,7 +143,7 @@ async def test_run_scraper_upcoming(
 
     scraper_mock.scrape_upcoming.assert_called_once_with(
         sport="basketball",
-        date="2023-06-01",
+        date="20230601",
         league="nba",
         markets=["1x2"],
         scrape_odds_history=False,
@@ -246,7 +251,7 @@ async def test_run_scraper_error_handling(sport_market_registrar_mock, proxy_man
     proxy_manager_mock.return_value = proxy_manager_instance
 
     result = await run_scraper(
-        command=CommandEnum.HISTORIC, sport="football", leagues=["premier-league"], season="2023"
+        command=CommandEnum.HISTORIC, sport="football", leagues=["premier-league"], from_date="2023", to_date="2023"
     )
 
     scraper_mock.stop_playwright.assert_called_once()
@@ -372,7 +377,8 @@ async def test_run_scraper_multiple_leagues_historic():
             command=CommandEnum.HISTORIC,
             sport="football",
             leagues=["england-premier-league", "spain-primera-division"],
-            season="2023",
+            from_date="2023",
+            to_date="2023",
             markets=["1x2"],
         )
 
@@ -535,21 +541,23 @@ async def test_run_scraper_upcoming_all_flag(
     proxy_manager_instance.get_current_proxy.return_value = {"server": "test-proxy"}
     proxy_manager_mock.return_value = proxy_manager_instance
 
-    with patch("src.core.scraper_app._scrape_all_sports") as multi_sport_mock:
+    with patch("src.core.scraper_app._scrape_all_sports_date_range") as multi_sport_mock:
         multi_sport_mock.return_value = [{"sport": "football", "matches": ["match1", "match2"]}]
 
         result = await run_scraper(
             command=CommandEnum.UPCOMING_MATCHES,
             all=True,
-            date="20250225",
+            from_date="20250225",
+            to_date="20250225",
             markets=["1x2"],
             headless=True,
         )
 
-        # Verify _scrape_all_sports was called instead of regular scraping
+        # Verify _scrape_all_sports_date_range was called instead of regular scraping
         multi_sport_mock.assert_called_once()
         call_args = multi_sport_mock.call_args
-        assert call_args[1]["date"] == "20250225"
+        assert call_args[1]["from_date"] == "20250225"
+        assert call_args[1]["to_date"] == "20250225"
         assert call_args[1]["markets"] == ["1x2"]
 
         # Verify playwright setup
@@ -588,7 +596,7 @@ async def test_run_scraper_historic_all_flag(
     proxy_manager_instance.get_current_proxy.return_value = {"server": "test-proxy"}
     proxy_manager_mock.return_value = proxy_manager_instance
 
-    with patch("src.core.scraper_app._scrape_all_sports") as multi_sport_mock:
+    with patch("src.core.scraper_app._scrape_all_sports_date_range") as multi_sport_mock:
         multi_sport_mock.return_value = [
             {"sport": "tennis", "matches": ["match1"]},
             {"sport": "basketball", "matches": ["match2", "match3"]},
@@ -597,16 +605,18 @@ async def test_run_scraper_historic_all_flag(
         result = await run_scraper(
             command=CommandEnum.HISTORIC,
             all=True,
-            season="2023-2024",
+            from_date="2023-2024",
+            to_date="2023-2024",
             markets=["1x2", "btts"],
             scrape_odds_history=True,
             headless=False,
         )
 
-        # Verify _scrape_all_sports was called instead of regular scraping
+        # Verify _scrape_all_sports_date_range was called instead of regular scraping
         multi_sport_mock.assert_called_once()
         call_args = multi_sport_mock.call_args
-        assert call_args[1]["season"] == "2023-2024"
+        assert call_args[1]["from_date"] == "2023-2024"
+        assert call_args[1]["to_date"] == "2023-2024"
         assert call_args[1]["markets"] == ["1x2", "btts"]
         assert call_args[1]["scrape_odds_history"] is True
 
@@ -614,3 +624,134 @@ async def test_run_scraper_historic_all_flag(
             {"sport": "tennis", "matches": ["match1"]},
             {"sport": "basketball", "matches": ["match2", "match3"]},
         ]
+
+
+# New tests for date range helper functions
+@pytest.mark.asyncio
+async def test_scrape_all_sports_date_range_success():
+    """Test _scrape_all_sports_date_range with successful scraping for date range."""
+    scraper_mock = MagicMock()
+    scrape_func_mock = AsyncMock()
+
+    # Mock successful scraping for each sport in date range
+    call_count = 0
+    async def mock_scrape_func(*args, **kwargs):
+        nonlocal call_count
+        call_count += 1
+        return [{"sport": f"sport_{call_count}", "date": kwargs.get('from_date'), "matches": [f"match_{call_count}"]}]
+
+    scrape_func_mock.side_effect = mock_scrape_func
+
+    with patch("src.core.scraper_app.retry_scrape", scrape_func_mock):
+        with patch("src.core.scraper_app.Sport") as sport_mock:
+            # Mock the Sport enum to have exactly 3 sports for testing
+            mock_sports = [MagicMock(value=f"sport_{i}") for i in range(3)]
+            sport_mock.__iter__ = Mock(return_value=iter(mock_sports))
+
+            result = await _scrape_all_sports_date_range(
+                scraper=scraper_mock,
+                command=CommandEnum.UPCOMING_MATCHES,
+                from_date="20250101",
+                to_date="20250101",
+                markets=["1x2"],
+            )
+
+    # Verify all 3 sports were processed
+    assert scrape_func_mock.call_count == 3
+    assert len(result) == 3
+
+
+@pytest.mark.asyncio
+async def test_scrape_multiple_leagues_date_range_success():
+    """Test _scrape_multiple_leagues_date_range with successful scraping."""
+    scraper_mock = MagicMock()
+    scrape_func_mock = AsyncMock()
+
+    # Mock successful scraping for each league
+    scrape_func_mock.side_effect = [
+        [{"match1": "data1"}],  # premier-league
+        [{"match2": "data2"}],  # primera-division
+    ]
+
+    with patch("src.core.scraper_app.retry_scrape", scrape_func_mock):
+        result = await _scrape_multiple_leagues_date_range(
+            scraper=scraper_mock,
+            command=CommandEnum.UPCOMING_MATCHES,
+            leagues=["england-premier-league", "spain-primera-division"],
+            sport="football",
+            from_date="20250101",
+            to_date="20250101",
+            markets=["1x2"],
+        )
+
+    # Verify all leagues were processed
+    assert scrape_func_mock.call_count == 2
+    assert len(result) == 2
+    assert result[0] == {"match1": "data1"}
+    assert result[1] == {"match2": "data2"}
+
+
+@pytest.mark.asyncio
+async def test_scrape_multiple_leagues_date_range_with_failures():
+    """Test _scrape_multiple_leagues_date_range with some failures."""
+    scraper_mock = MagicMock()
+    scrape_func_mock = AsyncMock()
+
+    # Mock mixed success/failure
+    scrape_func_mock.side_effect = [
+        [{"match1": "data1"}],  # premier-league - success
+        Exception("Network error"),  # primera-division - failure
+    ]
+
+    with patch("src.core.scraper_app.retry_scrape", scrape_func_mock):
+        result = await _scrape_multiple_leagues_date_range(
+            scraper=scraper_mock,
+            command=CommandEnum.UPCOMING_MATCHES,
+            leagues=["england-premier-league", "spain-primera-division"],
+            sport="football",
+            from_date="20250101",
+            to_date="20250101",
+            markets=["1x2"],
+        )
+
+    # Verify only successful results are included
+    assert len(result) == 1
+    assert result[0] == {"match1": "data1"}
+
+
+@pytest.mark.asyncio
+async def test_run_scraper_date_range_single_sport():
+    """Test run_scraper with date range for single sport."""
+    with (
+        patch("src.core.scraper_app.OddsPortalScraper") as scraper_cls_mock,
+        patch("src.core.scraper_app.OddsPortalMarketExtractor"),
+        patch("src.core.scraper_app.BrowserHelper"),
+        patch("src.core.scraper_app.PlaywrightManager"),
+        patch("src.core.scraper_app.ProxyManager"),
+        patch("src.core.scraper_app.SportMarketRegistrar"),
+        patch("src.core.scraper_app._scrape_single_sport_date_range") as date_range_mock,
+    ):
+        scraper_mock = MagicMock()
+        scraper_mock.start_playwright = AsyncMock()
+        scraper_mock.stop_playwright = AsyncMock()
+        scraper_cls_mock.return_value = scraper_mock
+
+        date_range_mock.return_value = [{"combined": "date_range_data"}]
+
+        result = await run_scraper(
+            command=CommandEnum.UPCOMING_MATCHES,
+            sport="football",
+            from_date="20250101",
+            to_date="20250107",
+            markets=["1x2"],
+        )
+
+        # Verify date range function was called
+        date_range_mock.assert_called_once()
+        call_args = date_range_mock.call_args
+        assert call_args[1]["sport"] == "football"
+        assert call_args[1]["from_date"] == "20250101"
+        assert call_args[1]["to_date"] == "20250107"
+        assert call_args[1]["markets"] == ["1x2"]
+
+        assert result == [{"combined": "date_range_data"}]

@@ -18,7 +18,8 @@ def mock_args():
         command="scrape_upcoming",
         sport="football",
         leagues=["england-premier-league"],
-        date=(datetime.now() + timedelta(days=1)).strftime("%Y%m%d"),  # Corrected format (YYYYMMDD)
+        from_date=(datetime.now() + timedelta(days=1)).strftime("%Y%m%d"),  # Corrected format (YYYYMMDD)
+        to_date=None,
         storage="local",
         format="json",
         file_path="data.json",
@@ -86,23 +87,49 @@ def test_validate_league_invalid(validator, mock_args):
         validator.validate_args(mock_args)
 
 
-def test_validate_date_invalid_format(validator, mock_args):
-    mock_args.date = "25-02-2025"
+def test_validate_date_range_invalid_format(validator, mock_args):
+    mock_args.from_date = "25-02-2025"
+    mock_args.to_date = None
     mock_args.match_links = None
     mock_args.leagues = None
 
     with pytest.raises(
-        ValueError, match="Invalid date format: '25-02-2025'. Expected format is YYYYMMDD \\(e.g., 20250227\\)."
+        ValueError, match="Invalid date format: '25-02-2025'. Supported formats: YYYYMMDD, YYYYMM, YYYY, or 'now'"
     ):
         validator.validate_args(mock_args)
 
 
-def test_validate_date_past_date(validator, mock_args):
-    mock_args.date = (datetime.now() - timedelta(days=1)).strftime("%Y%m%d")
+def test_validate_date_range_past_date(validator, mock_args):
+    mock_args.from_date = (datetime.now() - timedelta(days=1)).strftime("%Y%m%d")
+    mock_args.to_date = None
     mock_args.match_links = None
     mock_args.leagues = None
 
-    with pytest.raises(ValueError, match="Date .* must be today or in the future."):
+    with pytest.raises(ValueError, match="--from date must be today or in the future for upcoming matches."):
+        validator.validate_args(mock_args)
+
+
+def test_validate_date_range_to_before_from(validator, mock_args):
+    future_date = datetime.now() + timedelta(days=7)
+    past_date = datetime.now() + timedelta(days=1)
+    mock_args.from_date = future_date.strftime("%Y%m%d")
+    mock_args.to_date = past_date.strftime("%Y%m%d")
+    mock_args.match_links = None
+    mock_args.leagues = None
+
+    with pytest.raises(ValueError, match="--to date cannot be before --from date."):
+        validator.validate_args(mock_args)
+
+
+def test_validate_date_range_too_large(validator, mock_args):
+    start_date = datetime.now() + timedelta(days=1)
+    end_date = datetime.now() + timedelta(days=35)  # 35 days range
+    mock_args.from_date = start_date.strftime("%Y%m%d")
+    mock_args.to_date = end_date.strftime("%Y%m%d")
+    mock_args.match_links = None
+    mock_args.leagues = None
+
+    with pytest.raises(ValueError, match="Date range too large: .* days. Maximum allowed is 30 days"):
         validator.validate_args(mock_args)
 
 
@@ -177,60 +204,106 @@ def test_validate_empty_leagues_list():
 
 
 @pytest.mark.parametrize(
-    ("command", "season", "expected_errors"),
+    ("command", "from_date", "to_date", "expected_errors"),
     [
-        ("scrape_historic", "2023-2024", []),  # Valid format YYYY-YYYY
-        ("scrape_historic", "2023", []),  # Valid format YYYY
+        ("scrape_historic", "2023-2024", "2024-2025", []),  # Valid format YYYY-YYYY range
+        ("scrape_historic", "2023", "2023", []),  # Valid format YYYY single year
+        ("scrape_historic", "2023", None, []),  # Valid format YYYY without to_date
+        ("scrape_historic", "now", None, []),  # Valid "now" keyword
         (
             "scrape_historic",
-            "2022-2024",
-            ["Invalid season range: '2022-2024'. The second year must be exactly one year after the first year."],
-        ),  # Invalid range
-        (
-            "scrape_historic",
-            "202X",
-            ["Invalid season format: '202X'. Expected format: YYYY or YYYY-YYYY (e.g., 2024 or 2024-2025)."],
+            "invalid",
+            None,
+            ["Invalid season format: 'invalid'. Expected format: YYYY, YYYY-YYYY, or 'now' (e.g., 2023, 2022-2023, now)."],
         ),  # Invalid format
         (
             "scrape_historic",
             None,
-            ["The season argument is required for the 'scrape_historic' command."],
-        ),  # Missing season
-        ("scrape_upcoming", "2023-2024", []),  # Different command, no validation
+            None,
+            ["Missing required argument: '--from' is mandatory for 'scrape_historic' command."],
+        ),  # Missing from_date
+        ("scrape_upcoming", (datetime.now() + timedelta(days=1)).strftime("%Y%m%d"), (datetime.now() + timedelta(days=2)).strftime("%Y%m%d"), []),  # Different command, valid range
+        ("scrape_upcoming", "now", None, []),  # Valid "now" keyword for upcoming
     ],
 )
-def test_validate_season(validator, command, season, expected_errors):
-    errors = validator._validate_season(command=command, season=season)
+def test_validate_date_range(validator, command, from_date, to_date, expected_errors):
+    errors = validator._validate_date_range(
+        command=command, from_date=from_date, to_date=to_date, match_links=None, leagues=None
+    )
     assert errors == expected_errors
 
 
-def test_validate_date_with_match_links(validator):
-    errors = validator._validate_date(
-        command="scrape_upcoming", date=None, match_links=["https://www.oddsportal.com/match/123456"]
+def test_validate_date_range_with_match_links(validator):
+    errors = validator._validate_date_range(
+        command="scrape_upcoming", from_date=None, to_date=None,
+        match_links=["https://www.oddsportal.com/match/123456"], leagues=None
     )
-    assert not errors, "Validation should succeed when match_links is provided, even without date"
+    assert not errors, "Validation should succeed when match_links is provided, even without from_date"
 
 
-def test_validate_date_with_leagues(validator):
-    errors = validator._validate_date(
-        command="scrape_upcoming", date=None, match_links=None, leagues=["england-premier-league"]
+def test_validate_date_range_with_leagues(validator):
+    errors = validator._validate_date_range(
+        command="scrape_upcoming", from_date=None, to_date=None,
+        match_links=None, leagues=["england-premier-league"]
     )
-    assert not errors, "Validation should succeed when leagues are provided, even without date"
+    assert not errors, "Validation should succeed when leagues are provided, even without from_date"
 
-    errors = validator._validate_date(
-        command="scrape_upcoming",
-        date=None,
-        match_links=None,
-        leagues=["england-premier-league", "spain-primera-division"],
+    errors = validator._validate_date_range(
+        command="scrape_upcoming", from_date=None, to_date=None,
+        match_links=None, leagues=["england-premier-league", "spain-primera-division"]
     )
-    assert not errors, "Validation should succeed when multiple leagues are provided, even without date"
+    assert not errors, "Validation should succeed when multiple leagues are provided, even without from_date"
 
 
-def test_validate_date_wrong_command(validator):
-    """Test date validation for a command other than scrape_upcoming."""
-    errors = validator._validate_date(command="scrape_historic", date="20250101", match_links=None)
+def test_validate_date_range_wrong_command(validator):
+    """Test date range validation for a command other than scrape_upcoming/scrape_historic."""
+    errors = validator._validate_date_range(
+        command="invalid_command", from_date="20250101", to_date=None, match_links=None, leagues=None
+    )
     assert len(errors) == 1
-    assert "Date should not be provided for the 'scrape_historic' command." in errors[0]
+    assert "Date ranges should not be provided for the 'invalid_command' command." in errors[0]
+
+
+def test_validate_historic_season_range_too_large(validator):
+    """Test error when season range exceeds maximum years."""
+    errors = validator._validate_date_range(
+        command="scrape_historic", from_date="2010", to_date="2025", match_links=None, leagues=None
+    )
+    assert len(errors) == 1
+    assert "Season range too large:" in errors[0]
+    assert "Maximum allowed is 10 years" in errors[0]
+
+
+def test_validate_historic_season_to_before_from(validator):
+    """Test error when end season is before start season."""
+    errors = validator._validate_date_range(
+        command="scrape_historic", from_date="2025", to_date="2020", match_links=None, leagues=None
+    )
+    assert len(errors) == 1
+    assert "--to season/year cannot be before --from season/year." in errors[0]
+
+
+def test_parse_season_format_validation(validator):
+    """Test the _parse_season helper function."""
+    # Test valid season formats
+    result = validator._parse_season("2023")
+    assert result == ("2023", 2023)
+
+    result = validator._parse_season("2022-2023")
+    assert result == ("2022-2023", 2023)
+
+    result = validator._parse_season("now")
+    season_format, end_year = result
+    assert season_format == str(datetime.now().year)
+    assert end_year == datetime.now().year
+
+    # Test invalid season format
+    with pytest.raises(ValueError, match="Invalid season format: 'invalid'"):
+        validator._parse_season("invalid")
+
+    # Test invalid season range
+    with pytest.raises(ValueError, match="Invalid season range: '2022-2024'"):
+        validator._parse_season("2022-2024")
 
 
 @pytest.mark.parametrize(
@@ -349,7 +422,8 @@ def test_validate_file_args_format_only(validator):
 def test_validate_args_with_match_links(validator, mock_args):
     mock_args.match_links = ["https://www.oddsportal.com/football/match/123456"]
     mock_args.sport = "football"
-    mock_args.date = None
+    mock_args.from_date = None
+    mock_args.to_date = None
 
     try:
         validator.validate_args(mock_args)

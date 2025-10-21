@@ -43,13 +43,13 @@ def test_parse_and_validate_args_valid(cli_handler):
         mock_parse_args.return_value = MagicMock(
             command="scrape",
             sport="football",
-            date="2024-02-25",
+            from_date="20240225",
+            to_date=None,
             leagues=["england-premier-league"],
             storage="local",
             format="json",
             headless=True,
             markets=["1x2", "btts"],
-            season=None,
             file_path=None,
             max_pages=None,
             proxies=None,
@@ -68,9 +68,9 @@ def test_parse_and_validate_args_valid(cli_handler):
         assert parsed_args == {
             "command": "scrape",
             "sport": "football",
-            "date": "2024-02-25",
+            "from_date": "20240225",
+            "to_date": None,
             "leagues": ["england-premier-league"],
-            "season": None,
             "storage_type": "local",
             "storage_format": "json",
             "file_path": None,
@@ -103,9 +103,9 @@ def test_parse_and_validate_args_missing_command(cli_handler):
             return_value=MagicMock(
                 command=None,  # Simulate missing command
                 sport=None,
-                date=None,
+                from_date=None,
+                to_date=None,
                 leagues=None,
-                season=None,
                 storage="local",
                 format=None,
                 file_path=None,
@@ -129,7 +129,8 @@ def test_parse_and_validate_args_invalid_args(cli_handler):
         mock_parse_args.return_value = MagicMock(
             command="scrape",
             sport="invalid-sport",
-            date=None,
+            from_date=None,
+            to_date=None,
             leagues=None,
             storage="local",
             format=None,
@@ -162,11 +163,11 @@ def test_parse_and_validate_args_with_all_flag(cli_handler):
         mock_parse_args.return_value = MagicMock(
             command="scrape_upcoming",
             all=True,
-            date="2024-02-25",
+            from_date="20240225",
+            to_date=None,
             sport=None,
             leagues=None,
             markets=["1x2"],
-            season=None,
             file_path=None,
             max_pages=None,
             proxies=None,
@@ -186,7 +187,8 @@ def test_parse_and_validate_args_with_all_flag(cli_handler):
 
         assert parsed_args["all"] is True
         assert parsed_args["command"] == "scrape_upcoming"
-        assert parsed_args["date"] == "2024-02-25"
+        assert parsed_args["from_date"] == "20240225"
+        assert parsed_args["to_date"] is None
         assert parsed_args["markets"] == ["1x2"]
 
         mock_validate_args.assert_called_once_with(mock_parse_args.return_value)

@@ -20,8 +20,10 @@ def test_parse_scrape_upcoming(parser):
             "scrape_upcoming",
             "--sport",
             "football",
-            "--date",
+            "--from",
             "20250225",
+            "--to",
+            "20250227",
             "--leagues",
             "premier-league",
             "--markets",
@@ -38,7 +40,8 @@ def test_parse_scrape_upcoming(parser):
     )
     assert args.command == "scrape_upcoming"
     assert args.sport == "football"
-    assert args.date == "20250225"
+    assert args.from_date == "20250225"
+    assert args.to_date == "20250227"
     assert args.leagues == ["premier-league"]
     assert args.markets == ["1x2", "btts"]
     assert args.storage == "local"
@@ -54,8 +57,10 @@ def test_parse_scrape_historic(parser):
             "scrape_historic",
             "--sport",
             "tennis",
-            "--season",
+            "--from",
             "2023-2024",
+            "--to",
+            "2024-2025",
             "--leagues",
             "atp-tour",
             "--markets",
@@ -71,7 +76,8 @@ def test_parse_scrape_historic(parser):
     )
     assert args.command == "scrape_historic"
     assert args.sport == "tennis"
-    assert args.season == "2023-2024"
+    assert args.from_date == "2023-2024"
+    assert args.to_date == "2024-2025"
     assert args.leagues == ["atp-tour"]
     assert args.markets == ["match_winner", "over_under"]
     assert args.storage == "local"
@@ -102,7 +108,8 @@ def test_parser_defaults():
     assert args.scrape_odds_history is False
     assert args.odds_format == "Decimal Odds"
     assert args.concurrency_tasks == 3
-    assert args.date is None
+    assert hasattr(args, 'from_date') and args.from_date is None
+    assert hasattr(args, 'to_date') and args.to_date is None
     assert args.all is False
 
 
@@ -112,8 +119,10 @@ def test_parse_scrape_upcoming_with_all_flag(parser):
         [
             "scrape_upcoming",
             "--all",
-            "--date",
+            "--from",
             "20250225",
+            "--to",
+            "20250227",
             "--markets",
             "1x2,btts",
             "--storage",
@@ -122,13 +131,14 @@ def test_parse_scrape_upcoming_with_all_flag(parser):
     )
     assert args.command == "scrape_upcoming"
     assert args.all is True
-    assert args.date == "20250225"
+    assert args.from_date == "20250225"
+    assert args.to_date == "20250227"
     assert args.markets == ["1x2", "btts"]
     assert args.storage == "local"
 
 
-def test_parse_scrape_upcoming_all_without_date(parser):
-    """Test parsing scrape_upcoming with --all flag but no date (should default to None)."""
+def test_parse_scrape_upcoming_all_without_from_date(parser):
+    """Test parsing scrape_upcoming with --all flag but no --from (should default to None)."""
     args = parser.parse_args(
         [
             "scrape_upcoming",
@@ -139,7 +149,8 @@ def test_parse_scrape_upcoming_all_without_date(parser):
     )
     assert args.command == "scrape_upcoming"
     assert args.all is True
-    assert args.date is None
+    assert hasattr(args, 'from_date') and args.from_date is None
+    assert hasattr(args, 'to_date') and args.to_date is None
     assert args.markets == ["1x2"]
 
 
@@ -149,8 +160,10 @@ def test_parse_scrape_historic_with_all_flag(parser):
         [
             "scrape_historic",
             "--all",
-            "--season",
+            "--from",
             "2023-2024",
+            "--to",
+            "2024-2025",
             "--markets",
             "1x2,btts",
             "--storage",
@@ -160,7 +173,8 @@ def test_parse_scrape_historic_with_all_flag(parser):
     )
     assert args.command == "scrape_historic"
     assert args.all is True
-    assert args.season == "2023-2024"
+    assert args.from_date == "2023-2024"
+    assert args.to_date == "2024-2025"
     assert args.markets == ["1x2", "btts"]
     assert args.storage == "remote"
     assert args.headless is True
@@ -168,22 +182,22 @@ def test_parse_scrape_historic_with_all_flag(parser):
 
 def test_invalid_sport(parser):
     with pytest.raises(SystemExit):  # argparse raises SystemExit on invalid args
-        parser.parse_args(["scrape_upcoming", "--sport", "invalid_sport", "--date", "20250225"])
+        parser.parse_args(["scrape_upcoming", "--sport", "invalid_sport", "--from", "20250225"])
 
 
-def test_missing_season(parser):
+def test_missing_from_date_for_historic(parser):
     with pytest.raises(SystemExit):
         parser.parse_args(["scrape_historic"])
 
 
 def test_invalid_storage(parser):
     with pytest.raises(SystemExit):
-        parser.parse_args(["scrape_upcoming", "--date", "20250225", "--storage", "invalid_storage"])
+        parser.parse_args(["scrape_upcoming", "--from", "20250225", "--storage", "invalid_storage"])
 
 
 def test_invalid_format(parser):
     with pytest.raises(SystemExit):
-        parser.parse_args(["scrape_upcoming", "--date", "20250225", "--format", "invalid_format"])
+        parser.parse_args(["scrape_upcoming", "--from", "20250225", "--format", "invalid_format"])
 
 
 def test_parse_multiple_leagues(parser):
@@ -193,8 +207,10 @@ def test_parse_multiple_leagues(parser):
             "scrape_historic",
             "--sport",
             "football",
-            "--season",
+            "--from",
             "2023-2024",
+            "--to",
+            "2024-2025",
             "--leagues",
             "england-premier-league,spain-primera-division,italy-serie-a",
             "--markets",
@@ -203,7 +219,8 @@ def test_parse_multiple_leagues(parser):
     )
     assert args.command == "scrape_historic"
     assert args.sport == "football"
-    assert args.season == "2023-2024"
+    assert args.from_date == "2023-2024"
+    assert args.to_date == "2024-2025"
     assert args.leagues == ["england-premier-league", "spain-primera-division", "italy-serie-a"]
     assert args.markets == ["1x2", "btts"]
 
@@ -215,6 +232,8 @@ def test_parse_single_league_as_list(parser):
             "scrape_upcoming",
             "--sport",
             "tennis",
+            "--from",
+            "20250225",
             "--leagues",
             "french-open",
             "--markets",
@@ -231,8 +250,10 @@ def test_parse_leagues_with_spaces(parser):
             "scrape_historic",
             "--sport",
             "football",
-            "--season",
+            "--from",
             "2023",
+            "--to",
+            "2024",
             "--leagues",
             "england-premier-league, spain-primera-division, italy-serie-a",
             "--markets",
@@ -250,7 +271,7 @@ def test_parse_odds_format(parser):
             "scrape_upcoming",
             "--sport",
             "football",
-            "--date",
+            "--from",
             "20250225",
             "--odds_format",
             "Fractional Odds",
@@ -266,7 +287,7 @@ def test_parse_concurrency_tasks(parser):
             "scrape_upcoming",
             "--sport",
             "football",
-            "--date",
+            "--from",
             "20250225",
             "--concurrency_tasks",
             "5",
@@ -283,7 +304,7 @@ def test_invalid_odds_format(parser):
                 "scrape_upcoming",
                 "--sport",
                 "football",
-                "--date",
+                "--from",
                 "20250225",
                 "--odds_format",
                 "Invalid Format",
@@ -299,9 +320,112 @@ def test_invalid_concurrency_tasks(parser):
                 "scrape_upcoming",
                 "--sport",
                 "football",
-                "--date",
+                "--from",
                 "20250225",
                 "--concurrency_tasks",
                 "invalid",
             ]
         )
+
+
+# New tests for the new --from/--to functionality
+def test_parse_single_date(parser):
+    """Test parsing single date using only --from."""
+    args = parser.parse_args(
+        [
+            "scrape_upcoming",
+            "--sport",
+            "football",
+            "--from",
+            "20250101",
+            "--markets",
+            "1x2",
+        ]
+    )
+    assert args.command == "scrape_upcoming"
+    assert args.from_date == "20250101"
+    assert args.to_date is None
+    assert args.markets == ["1x2"]
+
+
+def test_parse_date_range(parser):
+    """Test parsing date range using --from and --to."""
+    args = parser.parse_args(
+        [
+            "scrape_upcoming",
+            "--sport",
+            "football",
+            "--from",
+            "20250101",
+            "--to",
+            "20250107",
+            "--markets",
+            "1x2",
+        ]
+    )
+    assert args.command == "scrape_upcoming"
+    assert args.from_date == "20250101"
+    assert args.to_date == "20250107"
+    assert args.markets == ["1x2"]
+
+
+def test_parse_single_season(parser):
+    """Test parsing single season using only --from."""
+    args = parser.parse_args(
+        [
+            "scrape_historic",
+            "--sport",
+            "football",
+            "--from",
+            "2023",
+            "--leagues",
+            "premier-league",
+            "--markets",
+            "1x2",
+        ]
+    )
+    assert args.command == "scrape_historic"
+    assert args.from_date == "2023"
+    assert args.to_date is None
+    assert args.leagues == ["premier-league"]
+
+
+def test_parse_season_range(parser):
+    """Test parsing season range using --from and --to."""
+    args = parser.parse_args(
+        [
+            "scrape_historic",
+            "--sport",
+            "football",
+            "--from",
+            "2021",
+            "--to",
+            "2023",
+            "--leagues",
+            "premier-league",
+            "--markets",
+            "1x2",
+        ]
+    )
+    assert args.command == "scrape_historic"
+    assert args.from_date == "2021"
+    assert args.to_date == "2023"
+    assert args.leagues == ["premier-league"]
+
+
+def test_parse_now_keyword(parser):
+    """Test parsing 'now' keyword."""
+    args = parser.parse_args(
+        [
+            "scrape_upcoming",
+            "--sport",
+            "football",
+            "--from",
+            "now",
+            "--markets",
+            "1x2",
+        ]
+    )
+    assert args.command == "scrape_upcoming"
+    assert args.from_date == "now"
+    assert args.to_date is None
