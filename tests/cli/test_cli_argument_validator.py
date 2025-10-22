@@ -34,6 +34,7 @@ def mock_args():
         target_bookmaker=None,
         odds_format="Decimal Odds",
         concurrency_tasks=3,
+        max_pages=None,  # Add max_pages to avoid mock issues
     )
 
 
@@ -52,7 +53,7 @@ def test_validate_command_invalid(validator, mock_args):
         validator.validate_args(mock_args)
 
 
-@pytest.mark.parametrize("invalid_sport", ["invalid_sport", "handball", 123, None])
+@pytest.mark.parametrize("invalid_sport", ["invalid_sport", "invalid_sport_name", 123, None])
 def test_validate_sport_invalid(invalid_sport):
     validator = CLIArgumentValidator()
 
@@ -99,7 +100,9 @@ def test_validate_date_range_invalid_format(validator, mock_args):
         validator.validate_args(mock_args)
 
 
-def test_validate_date_range_past_date(validator, mock_args):
+def test_validate_date_range_past_date_upcoming(validator, mock_args):
+    """Test that past dates are still rejected for upcoming matches when leagues are not provided."""
+    mock_args.command = "scrape_upcoming"
     mock_args.from_date = (datetime.now() - timedelta(days=1)).strftime("%Y%m%d")
     mock_args.to_date = None
     mock_args.match_links = None
@@ -107,6 +110,20 @@ def test_validate_date_range_past_date(validator, mock_args):
 
     with pytest.raises(ValueError, match="--from date must be today or in the future for upcoming matches."):
         validator.validate_args(mock_args)
+
+
+def test_validate_date_range_past_date_with_leagues(validator, mock_args):
+    """Test that past dates are allowed when leagues are provided (date validation is bypassed)."""
+    mock_args.command = "scrape_upcoming"
+    mock_args.from_date = (datetime.now() - timedelta(days=1)).strftime("%Y%m%d")
+    mock_args.to_date = None
+    mock_args.match_links = None
+    mock_args.leagues = ["england-premier-league"]  # When leagues are provided, date validation is bypassed
+
+    try:
+        validator.validate_args(mock_args)
+    except ValueError as e:
+        pytest.fail(f"Unexpected ValueError when leagues are provided: {e}")
 
 
 def test_validate_date_range_to_before_from(validator, mock_args):
@@ -121,16 +138,20 @@ def test_validate_date_range_to_before_from(validator, mock_args):
         validator.validate_args(mock_args)
 
 
-def test_validate_date_range_too_large(validator, mock_args):
+def test_validate_date_range_large_range(validator, mock_args):
+    """Test that large date ranges are now allowed."""
     start_date = datetime.now() + timedelta(days=1)
-    end_date = datetime.now() + timedelta(days=35)  # 35 days range
+    end_date = datetime.now() + timedelta(days=365)  # 1 year range - should be allowed now
     mock_args.from_date = start_date.strftime("%Y%m%d")
     mock_args.to_date = end_date.strftime("%Y%m%d")
     mock_args.match_links = None
     mock_args.leagues = None
 
-    with pytest.raises(ValueError, match="Date range too large: .* days. Maximum allowed is 30 days"):
+    # Should not raise any exception now that limits are removed
+    try:
         validator.validate_args(mock_args)
+    except ValueError as e:
+        pytest.fail(f"Unexpected ValueError: {e}")
 
 
 def test_validate_storage_invalid(validator, mock_args):
@@ -206,24 +227,25 @@ def test_validate_empty_leagues_list():
 @pytest.mark.parametrize(
     ("command", "from_date", "to_date", "expected_errors"),
     [
+        # Historic matches
         ("scrape_historic", "2023-2024", "2024-2025", []),  # Valid format YYYY-YYYY range
         ("scrape_historic", "2023", "2023", []),  # Valid format YYYY single year
         ("scrape_historic", "2023", None, []),  # Valid format YYYY without to_date
         ("scrape_historic", "now", None, []),  # Valid "now" keyword
+        ("scrape_historic", None, "2023", []),  # Valid only to_date
+        ("scrape_historic", None, None, []),  # Valid - defaults to now and unlimited past
         (
             "scrape_historic",
             "invalid",
             None,
             ["Invalid season format: 'invalid'. Expected format: YYYY, YYYY-YYYY, or 'now' (e.g., 2023, 2022-2023, now)."],
         ),  # Invalid format
-        (
-            "scrape_historic",
-            None,
-            None,
-            ["Missing required argument: '--from' is mandatory for 'scrape_historic' command."],
-        ),  # Missing from_date
-        ("scrape_upcoming", (datetime.now() + timedelta(days=1)).strftime("%Y%m%d"), (datetime.now() + timedelta(days=2)).strftime("%Y%m%d"), []),  # Different command, valid range
+        # Upcoming matches
+        ("scrape_upcoming", (datetime.now() + timedelta(days=1)).strftime("%Y%m%d"), (datetime.now() + timedelta(days=2)).strftime("%Y%m%d"), []),  # Valid range
         ("scrape_upcoming", "now", None, []),  # Valid "now" keyword for upcoming
+        ("scrape_upcoming", None, "now", []),  # Valid only to_date with now
+        ("scrape_upcoming", None, None, []),  # Valid - defaults to now and unlimited future
+        ("scrape_upcoming", (datetime.now() + timedelta(days=1)).strftime("%Y%m%d"), None, []),  # Valid single date
     ],
 )
 def test_validate_date_range(validator, command, from_date, to_date, expected_errors):
@@ -250,7 +272,7 @@ def test_validate_date_range_with_leagues(validator):
 
     errors = validator._validate_date_range(
         command="scrape_upcoming", from_date=None, to_date=None,
-        match_links=None, leagues=["england-premier-league", "spain-primera-division"]
+        match_links=None, leagues=["england-premier-league", "spain-la-liga"]
     )
     assert not errors, "Validation should succeed when multiple leagues are provided, even without from_date"
 
@@ -264,23 +286,31 @@ def test_validate_date_range_wrong_command(validator):
     assert "Date ranges should not be provided for the 'invalid_command' command." in errors[0]
 
 
-def test_validate_historic_season_range_too_large(validator):
-    """Test error when season range exceeds maximum years."""
+def test_validate_historic_season_range_large_range(validator):
+    """Test that large season ranges are now allowed."""
     errors = validator._validate_date_range(
-        command="scrape_historic", from_date="2010", to_date="2025", match_links=None, leagues=None
+        command="scrape_historic", from_date="1900", to_date="2025", match_links=None, leagues=None
     )
-    assert len(errors) == 1
-    assert "Season range too large:" in errors[0]
-    assert "Maximum allowed is 10 years" in errors[0]
+    # Should not have any errors now that limits are removed
+    assert len(errors) == 0
+
+
+def test_validate_historic_season_date_swapping(validator):
+    """Test that historical dates are automatically swapped when in wrong order."""
+    errors = validator._validate_date_range(
+        command="scrape_historic", from_date="now", to_date="2023", match_links=None, leagues=None
+    )
+    # Should not have any errors - dates should be automatically swapped
+    assert len(errors) == 0
 
 
 def test_validate_historic_season_to_before_from(validator):
-    """Test error when end season is before start season."""
+    """Test that historical dates are automatically swapped when in wrong order."""
     errors = validator._validate_date_range(
         command="scrape_historic", from_date="2025", to_date="2020", match_links=None, leagues=None
     )
-    assert len(errors) == 1
-    assert "--to season/year cannot be before --from season/year." in errors[0]
+    # Should not have any errors now - dates should be automatically swapped
+    assert len(errors) == 0
 
 
 def test_parse_season_format_validation(validator):
@@ -508,3 +538,74 @@ def test_validate_args_with_new_arguments(validator, mock_args):
     mock_args.concurrency_tasks = 0
     with pytest.raises(ValueError, match="Invalid concurrency tasks value: '0'. It must be a positive integer."):
         validator.validate_args(mock_args)
+
+
+def test_validate_now_keyword_upcoming(validator, mock_args):
+    """Test validation with 'now' keyword for upcoming matches."""
+    mock_args.command = "scrape_upcoming"
+    mock_args.from_date = "now"
+    mock_args.to_date = None
+    mock_args.match_links = None
+    mock_args.leagues = None
+
+    try:
+        validator.validate_args(mock_args)
+    except ValueError as e:
+        pytest.fail(f"Unexpected ValueError with 'now' keyword: {e}")
+
+
+def test_validate_now_keyword_historic(validator, mock_args):
+    """Test validation with 'now' keyword for historic matches."""
+    mock_args.command = "scrape_historic"
+    mock_args.from_date = "now"
+    mock_args.to_date = None
+    mock_args.match_links = None
+    mock_args.leagues = ["england-premier-league"]
+
+    try:
+        validator.validate_args(mock_args)
+    except ValueError as e:
+        pytest.fail(f"Unexpected ValueError with 'now' keyword: {e}")
+
+
+def test_validate_only_to_date_now(validator, mock_args):
+    """Test validation with only --to date set to 'now'."""
+    mock_args.command = "scrape_upcoming"
+    mock_args.from_date = None
+    mock_args.to_date = "now"
+    mock_args.match_links = None
+    mock_args.leagues = None
+
+    try:
+        validator.validate_args(mock_args)
+    except ValueError as e:
+        pytest.fail(f"Unexpected ValueError with only --to=now: {e}")
+
+
+def test_validate_date_range_with_unlimited_future(validator, mock_args):
+    """Test validation with from_date but no to_date (unlimited future)."""
+    mock_args.command = "scrape_upcoming"
+    future_date = (datetime.now() + timedelta(days=1)).strftime("%Y%m%d")
+    mock_args.from_date = future_date
+    mock_args.to_date = None
+    mock_args.match_links = None
+    mock_args.leagues = None
+
+    try:
+        validator.validate_args(mock_args)
+    except ValueError as e:
+        pytest.fail(f"Unexpected ValueError with unlimited future: {e}")
+
+
+def test_validate_date_range_with_unlimited_past(validator, mock_args):
+    """Test validation with only to_date for historic (unlimited past)."""
+    mock_args.command = "scrape_historic"
+    mock_args.from_date = None
+    mock_args.to_date = "2023"
+    mock_args.match_links = None
+    mock_args.leagues = ["england-premier-league"]
+
+    try:
+        validator.validate_args(mock_args)
+    except ValueError as e:
+        pytest.fail(f"Unexpected ValueError with unlimited past: {e}")

@@ -233,21 +233,21 @@ class TestValidateDateRange:
         start = datetime(2025, 1, 1)
         end = datetime(2025, 1, 10)
         # Should not raise any exception
-        validate_date_range(start, end, max_days=30)
+        validate_date_range(start, end)
 
-    def test_validate_range_too_large(self):
-        """Test error when range exceeds maximum days."""
-        start = datetime(2025, 1, 1)
-        end = datetime(2025, 2, 5)  # 36 days (31 in Jan + 5 in Feb)
-        with pytest.raises(ValueError, match="Date range too large: 36 days. Maximum allowed is 30 days"):
-            validate_date_range(start, end, max_days=30)
+    def test_validate_invalid_range(self):
+        """Test error when start date is after end date."""
+        start = datetime(2025, 2, 5)
+        end = datetime(2025, 1, 1)
+        with pytest.raises(ValueError, match="Invalid date range: start date .* is after end date .*"):
+            validate_date_range(start, end)
 
-    def test_validate_range_exact_limit(self):
-        """Test validating range exactly at limit."""
+    def test_validate_equal_dates(self):
+        """Test validating range with equal start and end dates."""
         start = datetime(2025, 1, 1)
-        end = datetime(2025, 1, 31)  # 31 days (including both start and end)
+        end = datetime(2025, 1, 1)
         # Should not raise any exception
-        validate_date_range(start, end, max_days=31)
+        validate_date_range(start, end)
 
 
 class TestValidateSeasonRange:
@@ -255,16 +255,16 @@ class TestValidateSeasonRange:
 
     def test_validate_valid_season_range(self):
         """Test validating a valid season range."""
-        validate_season_range(2020, 2025, max_years=10)
+        validate_season_range(2020, 2025)
 
-    def test_validate_season_range_too_large(self):
-        """Test error when season range exceeds maximum years."""
-        with pytest.raises(ValueError, match="Season range too large: 15 years. Maximum allowed is 10 years"):
-            validate_season_range(2020, 2034, max_years=10)
+    def test_validate_invalid_season_range(self):
+        """Test error when start year is after end year."""
+        with pytest.raises(ValueError, match="Invalid season range: start year .* is after end year .*"):
+            validate_season_range(2034, 2020)
 
-    def test_validate_season_range_exact_limit(self):
-        """Test validating season range exactly at limit."""
-        validate_season_range(2020, 2029, max_years=10)
+    def test_validate_equal_seasons(self):
+        """Test validating season range with equal start and end years."""
+        validate_season_range(2020, 2020)
 
 
 class TestNormalizeSeason:

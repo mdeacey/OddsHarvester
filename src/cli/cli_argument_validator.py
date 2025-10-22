@@ -197,38 +197,46 @@ class CLIArgumentValidator:
         """Validates date range for upcoming matches."""
         errors = []
 
-        if not from_date:
-            return [
-                "Missing required argument: '--from' is mandatory for 'scrape_upcoming' command when no leagues are specified."
-            ]
+        # Default to "now" if neither from_date nor to_date is provided (all upcoming)
+        if not from_date and not to_date:
+            from_date = "now"
+            to_date = None  # No end limit for all upcoming matches
 
-        # Default to_date to from_date if not provided
-        if not to_date:
+        # Default to_date to from_date if only from_date is provided (single date)
+        elif from_date and not to_date:
             to_date = from_date
+
+        # Default from_date to "now" if only to_date is provided
+        elif not from_date and to_date:
+            from_date = "now"
 
         try:
             start_date = parse_flexible_date(from_date)
-            end_date = parse_flexible_date(to_date)
+            # Only parse end_date if it's provided (not None)
+            if to_date:
+                end_date = parse_flexible_date(to_date)
+            else:
+                # For unlimited future, use a very distant future date
+                end_date = None
         except ValueError as e:
             errors.append(str(e))
             return errors
 
-        # Validate date range order
-        if end_date < start_date:
+        # Validate date range order (only if end_date is specified)
+        if end_date and end_date < start_date:
             errors.append("--to date cannot be before --from date.")
             return errors
 
-        # Validate that dates are not in the past for upcoming matches
+        # Validate that start date is not too far in the past for upcoming matches
         if start_date.date() < datetime.now().date():
             errors.append("--from date must be today or in the future for upcoming matches.")
-        elif end_date.date() < datetime.now().date():
-            errors.append("--to date must be today or in the future for upcoming matches.")
 
-        # Validate date range size (default 30 days max)
-        try:
-            validate_date_range(start_date, end_date, max_days=30)
-        except ValueError as e:
-            errors.append(str(e))
+        # Validate date range size (only if both dates are specified and end_date is not None)
+        if end_date:
+            try:
+                validate_date_range(start_date, end_date)
+            except ValueError as e:
+                errors.append(str(e))
 
         return errors
 
@@ -236,33 +244,49 @@ class CLIArgumentValidator:
         """Validates season/year range for historical matches."""
         errors = []
 
-        if not from_date:
-            return [
-                "Missing required argument: '--from' is mandatory for 'scrape_historic' command."
-            ]
+        # Default to "now" if neither from_date nor to_date is provided (all historical)
+        if not from_date and not to_date:
+            from_date = "now"
+            to_date = None  # No start limit for all historical (going backwards)
 
-        # Default to_date to from_date if not provided
-        if not to_date:
+        # Default to_date to from_date if only from_date is provided (single season)
+        elif from_date and not to_date:
             to_date = from_date
+
+        # Default to_date to "now" if only to_date is provided (from past to now)
+        elif not from_date and to_date:
+            # This means from earliest available data up to the specified end
+            from_date = None  # No start limit for all historical (going backwards)
 
         # Validate season formats (YYYY or YYYY-YYYY)
         try:
-            start_season = self._parse_season(from_date)
-            end_season = self._parse_season(to_date)
+            if from_date:
+                start_season = self._parse_season(from_date)
+            else:
+                # For unlimited past, use a very early year
+                start_season = (None, 1900)  # (format, year)
+
+            if to_date:
+                end_season = self._parse_season(to_date)
+            else:
+                # Default to current year for end if not specified
+                end_season = (str(datetime.now().year), datetime.now().year)
         except ValueError as e:
             errors.append(str(e))
             return errors
 
-        # Validate season range order
-        if end_season[1] < start_season[1]:
-            errors.append("--to season/year cannot be before --from season/year.")
-            return errors
+        # Validate season range order (only if both dates are specified)
+        if from_date and end_season[1] < start_season[1]:
+            # For historical matches, automatically swap dates if they're in wrong order
+            # This handles cases like --from now --to 2023, treating it as --from 2023 --to now
+            start_season, end_season = end_season, start_season
 
-        # Validate season range size (default 10 years max)
-        try:
-            validate_season_range(start_season[1], end_season[1], max_years=10)
-        except ValueError as e:
-            errors.append(str(e))
+        # Validate season range size (only if both dates are specified)
+        if from_date:
+            try:
+                validate_season_range(start_season[1], end_season[1])
+            except ValueError as e:
+                errors.append(str(e))
 
         return errors
 

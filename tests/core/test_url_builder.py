@@ -1,23 +1,33 @@
 import pytest
 from datetime import datetime
+from unittest.mock import patch
 
 from src.core.url_builder import URLBuilder
 from src.utils.constants import ODDSPORTAL_BASE_URL
 from src.utils.sport_league_constants import SPORTS_LEAGUES_URLS_MAPPING
 from src.utils.sport_market_constants import Sport
 
-# Create test mapping for sports and leagues
-SPORTS_LEAGUES_URLS_MAPPING[Sport.FOOTBALL] = {
-    "england-premier-league": f"{ODDSPORTAL_BASE_URL}/football/england/premier-league",
-    "la-liga": f"{ODDSPORTAL_BASE_URL}/football/spain/la-liga",
+# Create test mapping for sports and leagues (don't modify global)
+TEST_SPORTS_LEAGUES_URLS_MAPPING = {
+    Sport.FOOTBALL: {
+        "england-premier-league": f"{ODDSPORTAL_BASE_URL}/football/england/premier-league",
+        "la-liga": f"{ODDSPORTAL_BASE_URL}/football/spain/la-liga",
+    },
+    Sport.TENNIS: {
+        "atp-tour": f"{ODDSPORTAL_BASE_URL}/tennis/atp-tour",
+    },
+    Sport.BASEBALL: {
+        "mlb": f"{ODDSPORTAL_BASE_URL}/baseball/usa/mlb",
+        "japan-npb": f"{ODDSPORTAL_BASE_URL}/baseball/japan/npb",
+    },
 }
-SPORTS_LEAGUES_URLS_MAPPING[Sport.TENNIS] = {
-    "atp-tour": f"{ODDSPORTAL_BASE_URL}/tennis/atp-tour",
-}
-SPORTS_LEAGUES_URLS_MAPPING[Sport.BASEBALL] = {
-    "mlb": f"{ODDSPORTAL_BASE_URL}/baseball/usa/mlb",
-    "japan-npb": f"{ODDSPORTAL_BASE_URL}/baseball/japan/npb",
-}
+
+
+@pytest.fixture(autouse=True)
+def mock_sport_league_urls_mapping():
+    """Mock the SPORTS_LEAGUES_URLS_MAPPING to use test data."""
+    with patch('src.core.url_builder.SPORTS_LEAGUES_URLS_MAPPING', TEST_SPORTS_LEAGUES_URLS_MAPPING):
+        yield
 
 
 @pytest.mark.parametrize(
@@ -114,8 +124,8 @@ def test_get_historic_matches_url_invalid_season_range(sport, league, season, er
 
 def test_get_historic_matches_url_invalid_sport():
     """Test error handling for invalid sports."""
-    with pytest.raises(ValueError, match="'handball' is not a valid Sport"):
-        URLBuilder.get_historic_matches_url("handball", "champions-league", "2023-2024")
+    with pytest.raises(ValueError, match="'nonexistent_sport' is not a valid Sport"):
+        URLBuilder.get_historic_matches_url("nonexistent_sport", "champions-league", "2023-2024")
 
 
 def test_get_historic_matches_url_invalid_league():
@@ -166,8 +176,8 @@ def test_get_league_url(sport, league, expected_url):
 
 def test_get_league_url_invalid_sport():
     """Test get_league_url raises ValueError for unsupported sport."""
-    with pytest.raises(ValueError, match="'handball' is not a valid Sport"):
-        URLBuilder.get_league_url("handball", "champions-league")
+    with pytest.raises(ValueError, match="'nonexistent_sport' is not a valid Sport"):
+        URLBuilder.get_league_url("nonexistent_sport", "champions-league")
 
 
 def test_get_league_url_invalid_league():

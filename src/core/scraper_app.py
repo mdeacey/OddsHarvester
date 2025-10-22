@@ -102,9 +102,14 @@ async def run_scraper(
             )
 
         if command == CommandEnum.HISTORIC:
-            # Default to_date to from_date if not provided
-            if not to_date:
+            # Handle default behavior for historic matches
+            if not from_date and not to_date:
+                from_date = None  # No start limit - all historical going backwards
+                to_date = "now"    # End at current time
+            elif from_date and not to_date:
                 to_date = from_date
+            elif not from_date and to_date:
+                from_date = None  # No start limit - all historical going backwards
 
             if all:
                 # When --all flag is used, scrape all sports for the provided season range
@@ -187,8 +192,10 @@ async def run_scraper(
                 )
 
             # Regular upcoming matches scraping (single sport)
+            # If no from_date and no leagues, use default "now" (all upcoming matches)
             if not from_date and not leagues:
-                raise ValueError("Either '--from' or 'leagues' must be provided for upcoming matches scraping.")
+                from_date = "now"
+                to_date = None  # No end limit for all upcoming
 
             if leagues:
                 logger.info(f"""

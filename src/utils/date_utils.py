@@ -184,45 +184,39 @@ def get_date_granularity(date_str: str) -> str:
         )
 
 
-def validate_date_range(start_date: datetime, end_date: datetime, max_days: int = 30) -> None:
+def validate_date_range(start_date: datetime, end_date: datetime) -> None:
     """
-    Validate that a date range doesn't exceed maximum allowed days.
+    Validate that a date range is valid (start_date <= end_date).
 
     Args:
         start_date: Starting date
         end_date: Ending date
-        max_days: Maximum number of days allowed
 
     Raises:
-        ValueError: If date range exceeds maximum allowed days
+        ValueError: If start_date is after end_date
     """
-    days_diff = (end_date - start_date).days + 1  # Include both start and end dates
-
-    if days_diff > max_days:
+    if start_date > end_date:
         raise ValueError(
-            f"Date range too large: {days_diff} days. "
-            f"Maximum allowed is {max_days} days for upcoming matches."
+            f"Invalid date range: start date ({start_date.strftime('%Y-%m-%d')}) "
+            f"is after end date ({end_date.strftime('%Y-%m-%d')})."
         )
 
 
-def validate_season_range(start_year: int, end_year: int, max_years: int = 10) -> None:
+def validate_season_range(start_year: int, end_year: int) -> None:
     """
-    Validate that a season range doesn't exceed maximum allowed years.
+    Validate that a season range is valid (start_year <= end_year).
 
     Args:
         start_year: Starting year
         end_year: Ending year
-        max_years: Maximum number of years allowed
 
     Raises:
-        ValueError: If season range exceeds maximum allowed years
+        ValueError: If start_year is after end_year
     """
-    years_diff = end_year - start_year + 1
-
-    if years_diff > max_years:
+    if start_year > end_year:
         raise ValueError(
-            f"Season range too large: {years_diff} years. "
-            f"Maximum allowed is {max_years} years for historical matches."
+            f"Invalid season range: start year ({start_year}) "
+            f"is after end year ({end_year})."
         )
 
 

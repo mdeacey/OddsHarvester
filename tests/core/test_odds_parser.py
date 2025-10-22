@@ -168,12 +168,11 @@ class TestOddsParser:
         """Test successful parsing of odds history modal."""
         # Arrange
         with patch("src.core.market_extraction.odds_parser.datetime") as mock_datetime:
+            from datetime import datetime
             mock_now = MagicMock()
             mock_now.year = 2025
             mock_datetime.now.return_value = mock_now
-            mock_datetime.strptime.side_effect = lambda *args, **kwargs: __import__("datetime").datetime.strptime(
-                *args, **kwargs
-            )
+            mock_datetime.strptime.side_effect = lambda *args, **kwargs: datetime.strptime(*args, **kwargs)
 
             # Act
             result = odds_parser.parse_odds_history_modal(self.SAMPLE_HTML_ODDS_HISTORY)
@@ -184,6 +183,9 @@ class TestOddsParser:
             assert result["odds_history"][0]["odds"] == 1.95
             assert result["odds_history"][1]["odds"] == 1.90
             assert "opening_odds" in result
+            # Verify that timestamps include the mocked year (2025)
+            assert "2025" in result["odds_history"][0]["timestamp"]
+            assert "2025" in result["odds_history"][1]["timestamp"]
 
     def test_parse_odds_history_modal_invalid_html(self, odds_parser):
         """Test parsing odds history from invalid HTML."""

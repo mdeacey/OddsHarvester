@@ -93,8 +93,11 @@ class OddsParser:
             for ts, odd in zip(timestamps, odds_values, strict=False):
                 time_text = ts.get_text(strip=True)
                 try:
-                    dt = datetime.strptime(time_text, "%d %b, %H:%M")
-                    formatted_time = dt.replace(year=datetime.now(UTC).year).isoformat()
+                    # Parse with explicit year to avoid deprecation warning
+                    current_year = datetime.now(UTC).year
+                    time_text_with_year = f"{time_text} {current_year}"
+                    dt = datetime.strptime(time_text_with_year, "%d %b, %H:%M %Y")
+                    formatted_time = dt.isoformat()
                 except ValueError:
                     self.logger.warning(f"Failed to parse datetime: {time_text}")
                     continue
@@ -109,9 +112,13 @@ class OddsParser:
             opening_odds = None
             if opening_ts_div and opening_val_div:
                 try:
-                    dt = datetime.strptime(opening_ts_div.get_text(strip=True), "%d %b, %H:%M")
+                    # Parse with explicit year to avoid deprecation warning
+                    current_year = datetime.now(UTC).year
+                    opening_time_text = opening_ts_div.get_text(strip=True)
+                    opening_time_with_year = f"{opening_time_text} {current_year}"
+                    dt = datetime.strptime(opening_time_with_year, "%d %b, %H:%M %Y")
                     opening_odds = {
-                        "timestamp": dt.replace(year=datetime.now(UTC).year).isoformat(),
+                        "timestamp": dt.isoformat(),
                         "odds": float(opening_val_div.get_text(strip=True)),
                     }
                 except ValueError:

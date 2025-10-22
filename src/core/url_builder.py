@@ -108,14 +108,14 @@ class URLBuilder:
         return leagues[league]
 
     @staticmethod
-    def get_upcoming_matches_urls_for_range(sport: str, from_date: str, to_date: str, league: str | None = None) -> List[Tuple[str, str]]:
+    def get_upcoming_matches_urls_for_range(sport: str, from_date: str | None, to_date: str | None, league: str | None = None) -> List[Tuple[str, str]]:
         """
         Constructs URLs for upcoming matches across a date range.
 
         Args:
             sport (str): The sport for which URLs are required
-            from_date (str): Start date in flexible format (YYYYMMDD, YYYYMM, YYYY, or 'now')
-            to_date (str): End date in flexible format (YYYYMMDD, YYYYMM, YYYY, or 'now')
+            from_date (str | None): Start date in flexible format (YYYYMMDD, YYYYMM, YYYY, or 'now'), or None for "now"
+            to_date (str | None): End date in flexible format (YYYYMMDD, YYYYMM, YYYY, or 'now'), or None for unlimited future
             league (Optional[str]): Specific league to filter by
 
         Returns:
@@ -124,9 +124,20 @@ class URLBuilder:
         Raises:
             ValueError: If date formats are invalid
         """
+        # Handle default values
+        if not from_date:
+            from_date = "now"
+        if not to_date:
+            # If no to_date, default to single date (from_date only)
+            to_date = from_date
+
         try:
             start_date = parse_flexible_date(from_date)
-            end_date = parse_flexible_date(to_date)
+            # Only parse end_date if it's different from from_date
+            if to_date and to_date != from_date:
+                end_date = parse_flexible_date(to_date)
+            else:
+                end_date = start_date
         except ValueError as e:
             raise ValueError(f"Invalid date format: {e}")
 
@@ -144,14 +155,14 @@ class URLBuilder:
         return urls
 
     @staticmethod
-    def get_historic_matches_urls_for_range(sport: str, from_date: str, to_date: str, league: str) -> List[Tuple[str, str]]:
+    def get_historic_matches_urls_for_range(sport: str, from_date: str | None, to_date: str | None, league: str) -> List[Tuple[str, str]]:
         """
         Constructs URLs for historical matches across a season/year range.
 
         Args:
             sport (str): The sport for which URLs are required
-            from_date (str): Start season/year in format YYYY, YYYY-YYYY, or 'now'
-            to_date (str): End season/year in format YYYY, YYYY-YYYY, or 'now'
+            from_date (str | None): Start season/year in format YYYY, YYYY-YYYY, or 'now', or None for unlimited past
+            to_date (str | None): End season/year in format YYYY, YYYY-YYYY, or 'now', or None for current year
             league (str): The league to scrape
 
         Returns:
@@ -160,14 +171,31 @@ class URLBuilder:
         Raises:
             ValueError: If season formats are invalid
         """
+        # Handle default values
+        if not from_date and not to_date:
+            from_date = None  # No start limit - unlimited past
+            to_date = "now"    # End at current time
+        elif from_date and not to_date:
+            to_date = from_date
+        elif not from_date and to_date:
+            from_date = None  # No start limit - unlimited past
+
         try:
-            start_season_data = URLBuilder._parse_season_for_url(from_date)
-            end_season_data = URLBuilder._parse_season_for_url(to_date)
+            if from_date:
+                start_season_data = URLBuilder._parse_season_for_url(from_date)
+                start_year = start_season_data[1]
+            else:
+                # For unlimited past, start from a reasonable early year
+                start_year = 2000
+
+            if to_date:
+                end_season_data = URLBuilder._parse_season_for_url(to_date)
+                end_year = end_season_data[1]
+            else:
+                # Default to current year if not specified
+                end_year = datetime.now().year
         except ValueError as e:
             raise ValueError(f"Invalid season format: {e}")
-
-        start_year = start_season_data[1]
-        end_year = end_season_data[1]
 
         if end_year < start_year:
             raise ValueError("End season/year cannot be before start season/year")

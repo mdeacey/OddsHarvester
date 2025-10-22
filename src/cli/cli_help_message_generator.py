@@ -87,7 +87,6 @@ class CLIHelpMessageGenerator:
             "**Note:**\n"
             "- If both **from/to** and **leagues** are provided for `scrape_upcoming`, the scraper will ignore "
             "the dates and scrape all upcoming matches for those leagues.\n"
-            "- Date range limits: Maximum 30 days for upcoming matches, 10 years for historical data.\n"
             "- Ensure the proxy's **region matches** the `BROWSER_LOCALE_TIMEZONE` and `BROWSER_TIMEZONE_ID` "
             "settings for best results.\n"
         )
