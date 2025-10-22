@@ -53,6 +53,7 @@ async def run_scraper(
     headless: bool = True,
     preview_submarkets_only: bool = False,
     all: bool = False,
+    change_sensitivity: str = "normal",
 ) -> dict:
     """Runs the scraping process and handles execution."""
     logger.info(
@@ -61,7 +62,8 @@ async def run_scraper(
         f"max_pages={max_pages}, proxies={proxies}, browser_user_agent={browser_user_agent}, "
         f"browser_locale_timezone={browser_locale_timezone}, browser_timezone_id={browser_timezone_id}, "
         f"scrape_odds_history={scrape_odds_history}, target_bookmaker={target_bookmaker}, "
-        f"headless={headless}, preview_submarkets_only={preview_submarkets_only}, all={all}"
+        f"headless={headless}, preview_submarkets_only={preview_submarkets_only}, all={all}, "
+        f"change_sensitivity={change_sensitivity}"
     )
 
     proxy_manager = ProxyManager(cli_proxies=proxies)

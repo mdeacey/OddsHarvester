@@ -51,4 +51,5 @@ class CLIArgumentHandler:
             "scrape_odds_history": True,  # Always scrape odds history by default
             "preview_submarkets_only": getattr(args, "preview_submarkets_only", False),
             "all": getattr(args, "all", False),
+            "change_sensitivity": getattr(args, "change_sensitivity", "normal"),
         }

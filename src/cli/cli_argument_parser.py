@@ -39,16 +39,16 @@ class CLIArgumentParser:
         self._add_common_arguments(parser)
         parser.add_argument(
             "--from", type=str, dest="from_date",
-            help="📅 Start date for upcoming matches (format: YYYYMMDD, YYYYMM, YYYY, or 'now')."
+            help="Start date for upcoming matches (format: YYYYMMDD, YYYYMM, YYYY, or 'now')."
         )
         parser.add_argument(
             "--to", type=str, dest="to_date",
-            help="📅 End date for upcoming matches (format: YYYYMMDD, YYYYMM, YYYY, or 'now'). If not provided, defaults to --from date."
+            help="End date for upcoming matches (format: YYYYMMDD, YYYYMM, YYYY, or 'now'). If not provided, defaults to --from date."
         )
         parser.add_argument(
             "--all",
             action="store_true",
-            help="🌐 Scrape all 23 supported sports with a single command. Works with single dates or date ranges specified with --from/--to.",
+            help="� Scrape all 23 supported sports with a single command. Works with single dates or date ranges specified with --from/--to.",
         )
 
     def _add_historic_parser(self, subparsers):
@@ -58,17 +58,17 @@ class CLIArgumentParser:
         self._add_common_arguments(parser)
         parser.add_argument(
             "--from", type=str, dest="from_date",
-            help="📅 Start season/year for historical matches (format: YYYY, YYYY-YYYY, or 'now')."
+            help="� Start season/year for historical matches (format: YYYY, YYYY-YYYY, or 'now')."
         )
         parser.add_argument(
             "--to", type=str, dest="to_date",
-            help="📅 End season/year for historical matches (format: YYYY, YYYY-YYYY, or 'now'). If not provided, defaults to --from season."
+            help="� End season/year for historical matches (format: YYYY, YYYY-YYYY, or 'now'). If not provided, defaults to --from season."
         )
-        parser.add_argument("--max_pages", type=int, help="📑 Maximum number of pages to scrape (optional).")
+        parser.add_argument("--max_pages", type=int, help="� Maximum number of pages to scrape (optional).")
         parser.add_argument(
             "--all",
             action="store_true",
-            help="🌐 Scrape all 23 supported sports with a single command for the specified season range.",
+            help="� Scrape all 23 supported sports with a single command for the specified season range.",
         )
 
     def _add_common_arguments(self, parser):
@@ -77,7 +77,7 @@ class CLIArgumentParser:
             nargs="+",  # Allows multiple values
             type=str,
             default=None,
-            help="🔗 Specific match links to scrape. Overrides sport, league, and date.",
+            help="� Specific match links to scrape. Overrides sport, league, and date.",
         )
         parser.add_argument(
             "--sport",
@@ -93,19 +93,19 @@ class CLIArgumentParser:
         parser.add_argument(
             "--leagues",
             type=lambda s: s.split(","),
-            help="🏆 Comma-separated list of leagues to scrape (e.g., premier-league,champions-league).",
+            help="� Comma-separated list of leagues to scrape (e.g., premier-league,champions-league).",
         )
         parser.add_argument(
             "--markets",
             type=lambda s: s.split(","),
-            help="💰 Comma-separated list of markets to scrape (e.g., 1x2,btts).",
+            help="� Comma-separated list of markets to scrape (e.g., 1x2,btts).",
         )
         parser.add_argument(
             "--storage",
             type=str,
             choices=[f.value for f in StorageType],
             default="local",
-            help="💾 Storage type: local or remote (default: local).",
+            help="� Storage type: local or remote (default: local).",
         )
         parser.add_argument("--file_path", type=str, help="File path for saving data.")
         parser.add_argument(
@@ -113,22 +113,22 @@ class CLIArgumentParser:
             type=str,
             choices=[f.value for f in StorageFormat],
             default="json",
-            help="📝 Storage format (json or csv, default: json).",
+            help="� Storage format (json or csv, default: json).",
         )
         parser.add_argument(
             "--proxies",
             nargs="+",
             default=None,
-            help="🌐 List of proxies in 'server user pass' format (e.g., 'http://proxy.com:8080 user pass').",
+            help="� List of proxies in 'server user pass' format (e.g., 'http://proxy.com:8080 user pass').",
         )
         parser.add_argument(
-            "--browser_user_agent", type=str, default=None, help="🔍 Custom browser user agent (optional)."
+            "--browser_user_agent", type=str, default=None, help="� Custom browser user agent (optional)."
         )
         parser.add_argument(
             "--browser_locale_timezone",
             type=str,
             default=None,
-            help="🌍 Browser locale timezone (e.g., fr-BE) (optional).",
+            help="� Browser locale timezone (e.g., fr-BE) (optional).",
         )
         parser.add_argument(
             "--browser_timezone_id",
@@ -136,33 +136,45 @@ class CLIArgumentParser:
             default=None,
             help="⏰ Browser timezone ID (e.g., Europe/Brussels) (optional).",
         )
-        parser.add_argument("--headless", action="store_true", help="🕶️ Run browser in headless mode.")
-        parser.add_argument("--save_logs", action="store_true", help="📜 Save logs for debugging.")
+        parser.add_argument("--headless", action="store_true", help="� Run browser in headless mode.")
+        parser.add_argument("--save_logs", action="store_true", help="� Save logs for debugging.")
         parser.add_argument(
             "--target_bookmaker",
             type=str,
             default=None,
-            help="🎯 Specify a bookmaker name to only scrape data from that bookmaker.",
+            help="� Specify a bookmaker name to only scrape data from that bookmaker.",
         )
         parser.add_argument(
             "--odds_format",
             type=str,
             choices=[f.value for f in OddsFormat],
             default=OddsFormat.DECIMAL_ODDS.value,
-            help="💰 Odds format to display (default: Decimal Odds).",
+            help="� Odds format to display (default: Decimal Odds).",
         )
         parser.add_argument(
             "--concurrency_tasks",
             type=int,
             default=3,
-            help="⚡ Number of concurrent tasks for scraping (default: 3).",
+            help=" Number of concurrent tasks for scraping (default: 3).",
         )
         parser.add_argument(
             "--preview_submarkets_only",
             action="store_true",
             help=(
-                "👁️ Only scrape average odds from visible submarkets without loading "
+                "� Only scrape average odds from visible submarkets without loading "
                 "individual bookmaker details (faster, limited data)."
+            ),
+        )
+        parser.add_argument(
+            "--change_sensitivity",
+            type=str,
+            choices=["aggressive", "normal", "conservative"],
+            default="normal",
+            help=(
+                "Change sensitivity level for duplicate detection (default: normal). "
+                "Aggressive: Skip if >95%% odds unchanged, "
+                "Normal: Skip if 100%% odds unchanged, "
+                "Conservative: Always scrape known matches."
             ),
         )
 

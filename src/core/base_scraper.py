@@ -304,6 +304,7 @@ class BaseScraper:
                 "home_team": event_data.get("home"),
                 "away_team": event_data.get("away"),
                 "league_name": event_data.get("tournamentName"),
+                "sport": sport,  # Added sport field for better match identification
                 "home_score": event_body.get("homeResult"),
                 "away_score": event_body.get("awayResult"),
                 "partial_results": clean_html_text(event_body.get("partialresult")),

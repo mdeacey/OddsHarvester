@@ -36,6 +36,8 @@ def test_parse_scrape_upcoming(parser):
             "output.json",
             "--headless",
             "--save_logs",
+            "--change_sensitivity",
+            "aggressive",
         ]
     )
     assert args.command == "scrape_upcoming"
@@ -48,6 +50,7 @@ def test_parse_scrape_upcoming(parser):
     assert args.format == "json"
     assert args.file_path == "output.json"
     assert args.headless is True
+    assert args.change_sensitivity == "aggressive"
     assert args.save_logs is True
 
 
@@ -105,7 +108,7 @@ def test_parser_defaults():
     assert args.headless is False
     assert args.save_logs is False
     assert args.target_bookmaker is None
-    assert args.scrape_odds_history is False
+    assert args.change_sensitivity == "normal"  # New change sensitivity argument
     assert args.odds_format == "Decimal Odds"
     assert args.concurrency_tasks == 3
     assert hasattr(args, 'from_date') and args.from_date is None
@@ -515,3 +518,98 @@ def test_parse_only_to_date_historic(parser):
     assert args.to_date == "2023"
     assert args.leagues == ["england-premier-league"]
     assert args.markets == ["1x2"]
+
+
+def test_change_sensitivity_default_value(parser):
+    """Test that change_sensitivity defaults to 'normal'."""
+    args = parser.parse_args(
+        [
+            "scrape_upcoming",
+            "--sport",
+            "football",
+        ]
+    )
+    assert args.change_sensitivity == "normal"
+
+
+def test_change_sensitivity_aggressive(parser):
+    """Test parsing with aggressive change sensitivity."""
+    args = parser.parse_args(
+        [
+            "scrape_upcoming",
+            "--sport",
+            "football",
+            "--change_sensitivity",
+            "aggressive",
+        ]
+    )
+    assert args.change_sensitivity == "aggressive"
+
+
+def test_change_sensitivity_conservative(parser):
+    """Test parsing with conservative change sensitivity."""
+    args = parser.parse_args(
+        [
+            "scrape_upcoming",
+            "--sport",
+            "football",
+            "--change_sensitivity",
+            "conservative",
+        ]
+    )
+    assert args.change_sensitivity == "conservative"
+
+
+def test_change_sensitivity_invalid_choice(parser):
+    """Test that invalid change sensitivity values are rejected."""
+    with pytest.raises(SystemExit):
+        parser.parse_args(
+            [
+                "scrape_upcoming",
+                "--sport",
+                "football",
+                "--change_sensitivity",
+                "invalid_value",
+            ]
+        )
+
+
+def test_no_incremental_flag_exists(parser):
+    """Test that the old --incremental flag no longer exists."""
+    # This should fail because --incremental was removed
+    with pytest.raises(SystemExit):
+        parser.parse_args(
+            [
+                "scrape_upcoming",
+                "--sport",
+                "football",
+                "--incremental",
+            ]
+        )
+
+
+def test_change_sensitivity_applies_to_both_commands(parser):
+    """Test that change_sensitivity works for both upcoming and historic commands."""
+    # Test with upcoming
+    args_upcoming = parser.parse_args(
+        [
+            "scrape_upcoming",
+            "--sport",
+            "football",
+            "--change_sensitivity",
+            "conservative",
+        ]
+    )
+    assert args_upcoming.change_sensitivity == "conservative"
+
+    # Test with historic
+    args_historic = parser.parse_args(
+        [
+            "scrape_historic",
+            "--sport",
+            "football",
+            "--change_sensitivity",
+            "aggressive",
+        ]
+    )
+    assert args_historic.change_sensitivity == "aggressive"
