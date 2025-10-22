@@ -49,7 +49,7 @@ class OddsPortalMarketExtractor:
         sport: str,
         markets: list[str],
         period: str = "FullTime",
-        scrape_odds_history: bool = False,
+        scrape_odds_history: bool = True,  # Always scrape odds history by default
         target_bookmaker: str | None = None,
         preview_submarkets_only: bool = False,
     ) -> dict[str, Any]:
@@ -143,7 +143,7 @@ class OddsPortalMarketExtractor:
         specific_market: str | None = None,
         period: str = "FullTime",
         odds_labels: list | None = None,
-        scrape_odds_history: bool = False,
+        scrape_odds_history: bool = True,  # Always scrape odds history by default
         target_bookmaker: str | None = None,
         preview_submarkets_only: bool = False,
     ) -> list:

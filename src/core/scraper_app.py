@@ -49,7 +49,7 @@ async def run_scraper(
     browser_locale_timezone: str | None = None,
     browser_timezone_id: str | None = None,
     target_bookmaker: str | None = None,
-    scrape_odds_history: bool = False,
+    scrape_odds_history: bool = True,  # Always scrape odds history by default
     headless: bool = True,
     preview_submarkets_only: bool = False,
     all: bool = False,

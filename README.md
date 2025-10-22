@@ -184,7 +184,6 @@ Retrieve odds and event details for upcoming sports matches.
 | `--browser_timezone_id`     | Browser timezone ID (e.g., `Europe/Brussels`).                                                                        | ❌                                                  | None           |
 | `--match_links`             | List of specific match links to scrape (overrides other filters).                                                     | ❌                                                  | None           |
 | `--target_bookmaker`        | Filter scraping for a specific bookmaker (e.g., `Betclic.fr`).                                                        | ❌                                                  | None           |
-| `--scrape_odds_history`     | Include odds movement history by hovering modals.                                                                     | ❌                                                  | `False`        |
 | `--odds_format`             | Odds format to display (`Decimal Odds`, `Fractional Odds`, `Money Line Odds`, `Hong Kong Odds`).                      | ❌                                                  | `Decimal Odds` |
 | `--concurrency_tasks`       | Number of concurrent tasks for scraping.                                                                              | ❌                                                  | `3`            |
 | `--preview_submarkets_only` | Only scrape average odds from visible submarkets without loading individual bookmaker details (faster, limited data). | ❌                                                  | `False`        |
@@ -199,6 +198,7 @@ Retrieve odds and event details for upcoming sports matches.
 - **Single Sport Requirement**: All match links must belong to the same sport when using `--match_links`.
 - **`--all` Flag**: The `--all` flag scrapes all 23 supported sports for single dates or date ranges. This is a comprehensive operation that may take considerable time.
 - **Proxy Configuration**: For best results, ensure the proxy's region matches the `BROWSER_LOCALE_TIMEZONE` and `BROWSER_TIMEZONE_ID` settings.
+- **Odds History Included**: The system now automatically includes odds movement history (hover-over modal data) by default, providing complete odds evolution timeline for each bookmaker.
 
 #### **Example Usage:**
 
@@ -297,7 +297,6 @@ Retrieve historical odds and results for analytical purposes.
 | `--browser_timezone_id`     | Browser timezone ID (e.g., `Europe/Brussels`).                                                                        | ❌          | None           |
 | `--match_links`             | List of specific match links to scrape (overrides other filters).                                                     | ❌          | None           |
 | `--target_bookmaker`        | Filter scraping for a specific bookmaker (e.g., `Betclic.fr`).                                                        | ❌          | None           |
-| `--scrape_odds_history`     | Include odds movement history by hovering modals.                                                                     | ❌          | `False`        |
 | `--odds_format`             | Odds format to display (`Decimal Odds`, `Fractional Odds`, `Money Line Odds`, `Hong Kong Odds`).                      | ❌          | `Decimal Odds` |
 | `--concurrency_tasks`       | Number of concurrent tasks for scraping.                                                                              | ❌          | `3`            |
 | `--preview_submarkets_only` | Only scrape average odds from visible submarkets without loading individual bookmaker details (faster, limited data). | ❌          | `False`        |

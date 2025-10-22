@@ -145,11 +145,6 @@ class CLIArgumentParser:
             help="🎯 Specify a bookmaker name to only scrape data from that bookmaker.",
         )
         parser.add_argument(
-            "--scrape_odds_history",
-            action="store_true",
-            help="📈 Include to scrape historical odds movement (hover-over modal).",
-        )
-        parser.add_argument(
             "--odds_format",
             type=str,
             choices=[f.value for f in OddsFormat],

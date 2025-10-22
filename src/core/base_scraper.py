@@ -121,7 +121,7 @@ class BaseScraper:
         sport: str,
         match_links: list[str],
         markets: list[str] | None = None,
-        scrape_odds_history: bool = False,
+        scrape_odds_history: bool = True,  # Always scrape odds history by default
         target_bookmaker: str | None = None,
         concurrent_scraping_task: int = 3,
         preview_submarkets_only: bool = False,
@@ -188,7 +188,7 @@ class BaseScraper:
         sport: str,
         match_link: str,
         markets: list[str] | None = None,
-        scrape_odds_history: bool = False,
+        scrape_odds_history: bool = True,  # Always scrape odds history by default
         target_bookmaker: str | None = None,
         preview_submarkets_only: bool = False,
     ) -> dict[str, Any] | None:

@@ -46,7 +46,7 @@ class OddsPortalScraper(BaseScraper):
         league: str,
         season: str,
         markets: list[str] | None = None,
-        scrape_odds_history: bool = False,
+        scrape_odds_history: bool = True,  # Always scrape odds history by default
         target_bookmaker: str | None = None,
         max_pages: int | None = None,
     ) -> list[dict[str, Any]]:
@@ -106,7 +106,7 @@ class OddsPortalScraper(BaseScraper):
         date: str,
         league: str | None = None,
         markets: list[str] | None = None,
-        scrape_odds_history: bool = False,
+        scrape_odds_history: bool = True,  # Always scrape odds history by default
         target_bookmaker: str | None = None,
     ) -> list[dict[str, Any]]:
         """
@@ -163,7 +163,7 @@ class OddsPortalScraper(BaseScraper):
         match_links: list[str],
         sport: str,
         markets: list[str] | None = None,
-        scrape_odds_history: bool = False,
+        scrape_odds_history: bool = True,  # Always scrape odds history by default
         target_bookmaker: str | None = None,
     ) -> list[dict[str, Any]]:
         """

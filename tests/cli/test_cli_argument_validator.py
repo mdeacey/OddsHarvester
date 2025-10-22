@@ -470,13 +470,6 @@ def test_validate_target_bookmaker(validator, mock_args):
         validator.validate_args(mock_args)
 
 
-def test_validate_scrape_odds_history(validator, mock_args):
-    mock_args.scrape_odds_history = True
-    validator.validate_args(mock_args)
-
-    mock_args.scrape_odds_history = "yes"
-    with pytest.raises(ValueError, match="'--scrape-odds-history' must be a boolean flag."):
-        validator.validate_args(mock_args)
 
 
 @pytest.mark.parametrize(

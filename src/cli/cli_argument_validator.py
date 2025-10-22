@@ -63,9 +63,7 @@ class CLIArgumentValidator:
         if hasattr(args, "target_bookmaker") and args.target_bookmaker and not isinstance(args.target_bookmaker, str):
             errors.append("Target bookmaker must be a string if specified.")
 
-        if hasattr(args, "scrape_odds_history") and not isinstance(args.scrape_odds_history, bool):
-            errors.append("'--scrape-odds-history' must be a boolean flag.")
-
+  
         if hasattr(args, "odds_format"):
             errors.extend(self._validate_odds_format(odds_format=args.odds_format))
 
