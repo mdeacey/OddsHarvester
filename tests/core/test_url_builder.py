@@ -371,3 +371,160 @@ class TestParseSeasonForUrl:
         """Test error handling for invalid season range."""
         with pytest.raises(ValueError, match="Invalid season range: '2022-2024'"):
             URLBuilder._parse_season_for_url("2022-2024")
+
+
+class TestGetAllAvailableSeasonsUrlRange:
+    """Test the get_all_available_seasons_url_range method."""
+
+    def test_get_all_available_seasons_default_range(self):
+        """Test generating URLs for all available seasons with default range."""
+        current_year = datetime.now().year
+
+        urls_with_seasons = URLBuilder.get_all_available_seasons_url_range(
+            sport="football", league="england-premier-league"
+        )
+
+        # Should generate from 1998 to current year + 2
+        expected_years = current_year + 2 - 1998 + 1
+        assert len(urls_with_seasons) == expected_years
+
+        # Check first and last seasons
+        first_url, first_season = urls_with_seasons[0]
+        last_url, last_season = urls_with_seasons[-1]
+
+        assert first_season == "1998"
+        assert first_url == f"{ODDSPORTAL_BASE_URL}/football/england/premier-league-1998/results/"
+        assert last_season == str(current_year + 2)
+        assert last_url == f"{ODDSPORTAL_BASE_URL}/football/england/premier-league-{current_year + 2}/results/"
+
+    def test_get_all_available_seasons_custom_range(self):
+        """Test generating URLs with custom fallback range."""
+        urls_with_seasons = URLBuilder.get_all_available_seasons_url_range(
+            sport="football", league="england-premier-league",
+            fallback_start_year=2020, fallback_end_year=2022
+        )
+
+        assert len(urls_with_seasons) == 3
+        seasons = [season for _, season in urls_with_seasons]
+        assert "2020" in seasons
+        assert "2021" in seasons
+        assert "2022" in seasons
+
+        # Check URL format
+        for url, season_str in urls_with_seasons:
+            assert url == f"{ODDSPORTAL_BASE_URL}/football/england/premier-league-{season_str}/results/"
+
+    def test_get_all_available_seasons_different_sports(self):
+        """Test generating URLs for different sports."""
+        football_urls = URLBuilder.get_all_available_seasons_url_range(
+            sport="football", league="england-premier-league",
+            fallback_start_year=2021, fallback_end_year=2021
+        )
+        tennis_urls = URLBuilder.get_all_available_seasons_url_range(
+            sport="tennis", league="atp-tour",
+            fallback_start_year=2021, fallback_end_year=2021
+        )
+
+        assert len(football_urls) == 1
+        assert len(tennis_urls) == 1
+
+        # Check URLs are sport-specific
+        football_url, football_season = football_urls[0]
+        tennis_url, tennis_season = tennis_urls[0]
+
+        assert football_url == f"{ODDSPORTAL_BASE_URL}/football/england/premier-league-2021/results/"
+        assert tennis_url == f"{ODDSPORTAL_BASE_URL}/tennis/atp-tour-2021/results/"
+
+
+class TestDiscoverAvailableSeasons:
+    """Test the discover_available_seasons method."""
+
+    @pytest.mark.asyncio
+    async def test_discover_seasons_success(self):
+        """Test successful season discovery with mock page."""
+        # This would require mocking Playwright page object
+        # For now, we'll test the method structure with a basic mock
+        from unittest.mock import AsyncMock, MagicMock
+
+        mock_page = AsyncMock()
+        mock_page.goto = AsyncMock()
+        mock_page.wait_for_timeout = AsyncMock()
+        mock_page.query_selector_all = AsyncMock(return_value=[])
+        mock_page.content = AsyncMock(return_value='<html>Season 2020-2021 Season 2021-2022</html>')
+
+        # Test with content-based discovery
+        earliest, latest = await URLBuilder.discover_available_seasons(
+            "football", "england-premier-league", mock_page
+        )
+
+        # Should find seasons 2020, 2021, and 2022 in content
+        # Content has "2020-2021", "2021-2022" which matches patterns that find 2020, 2021, 2022
+        assert earliest == 2019  # 2020 - 1 (buffer)
+        assert latest == 2024    # 2022 + 2 (buffer)
+
+    @pytest.mark.asyncio
+    async def test_discover_seasons_no_content(self):
+        """Test season discovery when no seasons found."""
+        from unittest.mock import AsyncMock
+
+        mock_page = AsyncMock()
+        mock_page.goto = AsyncMock()
+        mock_page.wait_for_timeout = AsyncMock()
+        mock_page.query_selector_all = AsyncMock(return_value=[])
+        mock_page.content = AsyncMock(return_value='<html>No seasons here</html>')
+
+        earliest, latest = await URLBuilder.discover_available_seasons(
+            "football", "england-premier-league", mock_page
+        )
+
+        # Should return None when no seasons found
+        assert earliest is None
+        assert latest is None
+
+    @pytest.mark.asyncio
+    async def test_discover_seasons_exception_handling(self):
+        """Test season discovery exception handling."""
+        from unittest.mock import AsyncMock
+
+        mock_page = AsyncMock()
+        mock_page.goto = AsyncMock(side_effect=Exception("Navigation failed"))
+
+        earliest, latest = await URLBuilder.discover_available_seasons(
+            "football", "england-premier-league", mock_page
+        )
+
+        # Should return None when exception occurs
+        assert earliest is None
+        assert latest is None
+
+
+class TestHistoricMatchesUrlsForRangeEdgeCases:
+    """Test edge cases for get_historic_matches_urls_for_range method."""
+
+    def test_unlimited_past_with_to_date(self):
+        """Test unlimited past (None from_date) with specific to_date."""
+        urls_with_seasons = URLBuilder.get_historic_matches_urls_for_range(
+            sport="football", from_date=None, to_date="2022", league="england-premier-league"
+        )
+
+        # Should generate from 1998 (default start) to 2022
+        expected_count = 2022 - 1998 + 1
+        assert len(urls_with_seasons) == expected_count
+
+        first_season = urls_with_seasons[0][1]
+        last_season = urls_with_seasons[-1][1]
+        assert first_season == "1998"
+        assert last_season == "2022"
+
+    def test_unlimited_future_with_from_date(self):
+        """Test when only from_date is specified (should mirror to from_date)."""
+        urls_with_seasons = URLBuilder.get_historic_matches_urls_for_range(
+            sport="football", from_date="2020", to_date=None, league="england-premier-league"
+        )
+
+        # When only from_date is specified, to_date should be set to from_date (single year)
+        assert len(urls_with_seasons) == 1
+
+        first_season = urls_with_seasons[0][1]
+        assert first_season == "2020"
+        assert urls_with_seasons[0][0] == f"{ODDSPORTAL_BASE_URL}/football/england/premier-league-2020/results/"
