@@ -35,6 +35,7 @@ def mock_args():
         odds_format="Decimal Odds",
         concurrency_tasks=3,
         max_pages=None,  # Add max_pages to avoid mock issues
+        all=False,  # Add all flag to avoid mock issues
     )
 
 

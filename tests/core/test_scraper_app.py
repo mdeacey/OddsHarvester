@@ -404,7 +404,7 @@ async def test_run_scraper_multiple_leagues_historic():
 @pytest.mark.parametrize(
     ("command", "params", "error_message"),
     [
-        (CommandEnum.HISTORIC, {}, "Both 'sport' and 'leagues' must be provided for historic scraping."),
+        (CommandEnum.HISTORIC, {}, "Sport must be provided for historic scraping."),
         (
             CommandEnum.UPCOMING_MATCHES,
             {"sport": "football"},
@@ -426,8 +426,8 @@ def test_run_scraper_validation(command, params, error_message):
         if command == CommandEnum.HISTORIC:
             sport = params.get("sport")
             leagues = params.get("leagues")
-            if not sport or not leagues:
-                raise ValueError("Both 'sport' and 'leagues' must be provided for historic scraping.")
+            if not sport:
+                raise ValueError("Sport must be provided for historic scraping.")
         elif command == CommandEnum.UPCOMING_MATCHES:
             date = params.get("date")
             if not date:
@@ -873,3 +873,110 @@ async def test_run_scraper_upcoming_with_leagues_no_date():
         assert call_args[1]["markets"] == ["1x2"]
 
         assert result == [{"league": "data"}]
+
+
+@pytest.mark.asyncio
+async def test_scrape_historic_all_leagues_success():
+    """Test _scrape_historic_all_leagues with successful scraping for all leagues."""
+    from src.core.scraper_app import _scrape_historic_all_leagues
+
+    scraper_mock = MagicMock()
+    scrape_func_mock = AsyncMock(return_value=[{"match": "data"}])
+
+    # Mock _scrape_historic_date_range to return different data for each league
+    call_count = 0
+    async def mock_scrape_historic_date_range(scraper, sport, league, from_date, to_date, **kwargs):
+        nonlocal call_count
+        call_count += 1
+        return [{"sport": sport, "league": league, "match": f"data_{call_count}"}]
+
+    # Patch the _scrape_historic_date_range function
+    with patch('src.core.scraper_app._scrape_historic_date_range', side_effect=mock_scrape_historic_date_range):
+        result = await _scrape_historic_all_leagues(
+            scraper=scraper_mock,
+            sport="football",
+            from_date="2023",
+            to_date="2023"
+        )
+
+    # Should have data from all football leagues (34 leagues)
+    assert len(result) == 34
+    assert result[0]["sport"] == "football"
+    assert "league" in result[0]
+    assert result[0]["match"] == "data_1"
+    assert result[-1]["match"] == "data_34"
+
+
+@pytest.mark.asyncio
+async def test_scrape_historic_all_leagues_with_failures():
+    """Test _scrape_historic_all_leagues handles failures gracefully."""
+    from src.core.scraper_app import _scrape_historic_all_leagues
+
+    scraper_mock = MagicMock()
+
+    # Mock _scrape_historic_date_range to fail for some leagues
+    async def mock_scrape_historic_date_range_with_failures(scraper, sport, league, from_date, to_date, **kwargs):
+        if league in ["france-ligue-1", "england-championship"]:  # Make 2 leagues fail
+            raise ValueError(f"Network error for {league}")
+        return [{"sport": sport, "league": league, "match": "data"}]
+
+    # Patch the _scrape_historic_date_range function
+    with patch('src.core.scraper_app._scrape_historic_date_range', side_effect=mock_scrape_historic_date_range_with_failures):
+        result = await _scrape_historic_all_leagues(
+            scraper=scraper_mock,
+            sport="football",
+            from_date="2023",
+            to_date="2023"
+        )
+
+    # Should have data from successful leagues only (34 - 2 = 32 leagues)
+    assert len(result) == 32
+    # Verify that the failed leagues are not in the results
+    leagues_in_result = [item["league"] for item in result]
+    assert "france-ligue-1" not in leagues_in_result
+    assert "england-championship" not in leagues_in_result
+
+
+@pytest.mark.asyncio
+async def test_scrape_historic_all_leagues_invalid_sport():
+    """Test _scrape_historic_all_leagues with invalid sport."""
+    from src.core.scraper_app import _scrape_historic_all_leagues
+
+    scraper_mock = MagicMock()
+
+    result = await _scrape_historic_all_leagues(
+        scraper=scraper_mock,
+        sport="invalid-sport",
+        from_date="2023",
+        to_date="2023"
+    )
+
+    # Should return empty list for invalid sport
+    assert result == []
+
+
+@pytest.mark.asyncio
+async def test_scrape_single_league_date_range_with_auto_discovery():
+    """Test _scrape_single_league_date_range with league=None (auto-discovery)."""
+    from src.core.scraper_app import _scrape_single_league_date_range
+    from src.utils.command_enum import CommandEnum
+
+    scraper_mock = MagicMock()
+
+    # Mock the auto-discovery function
+    async def mock_auto_discovery(scraper, sport, from_date, to_date, **kwargs):
+        return [{"sport": sport, "auto_discovered": True, "match": "data"}]
+
+    with patch('src.core.scraper_app._scrape_historic_all_leagues', side_effect=mock_auto_discovery):
+        result = await _scrape_single_league_date_range(
+            scraper=scraper_mock,
+            command=CommandEnum.HISTORIC,
+            sport="football",
+            league=None,  # This should trigger auto-discovery
+            from_date="2023",
+            to_date="2023"
+        )
+
+    assert len(result) == 1
+    assert result[0]["sport"] == "football"
+    assert result[0]["auto_discovered"] is True

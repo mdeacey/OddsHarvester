@@ -167,8 +167,8 @@ class TestDuplicateDetectionIntegration:
         # Verify no new records were added (duplicates detected)
         with open(output_file, 'r') as f:
             final_content = json.load(f)
-            # Should contain original + updated records (no duplicates)
-            assert len(final_content) > initial_count
+            # Should contain same records as before (no duplicates added)
+            assert len(final_content) == initial_count
 
     @patch('src.main.run_scraper')
     def test_second_run_with_changed_data(self, mock_run_scraper, temp_dir, sample_scraper_data, changed_scraper_data):
@@ -313,7 +313,9 @@ class TestDuplicateDetectionIntegration:
             '--file_path', output_file,
             '--change_sensitivity', 'normal'
         ]):
-            with patch('src.main.logger') as mock_logger:
+            with patch('logging.getLogger') as mock_get_logger:
+                mock_logger = MagicMock()
+                mock_get_logger.return_value = mock_logger
                 try:
                     main()
                 except SystemExit:

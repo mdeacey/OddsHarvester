@@ -28,9 +28,6 @@ class CLIArgumentValidator:
 
         errors = []
 
-        if hasattr(args, "match_links"):
-            errors.extend(self._validate_match_links(match_links=args.match_links, sport=args.sport))
-
         # Conditional validation: bypass sport/markets/leagues validation when --all flag is used without sport
         should_bypass_validation = (
             hasattr(args, "all") and args.all and
@@ -46,6 +43,10 @@ class CLIArgumentValidator:
 
             if hasattr(args, "leagues"):
                 errors.extend(self._validate_leagues(sport=args.sport, leagues=args.leagues))
+
+        # Match links validation should happen after bypass logic
+        if hasattr(args, "match_links"):
+            errors.extend(self._validate_match_links(match_links=args.match_links, sport=args.sport))
 
         if hasattr(args, "from_date") and hasattr(args, "to_date"):
             errors.extend(

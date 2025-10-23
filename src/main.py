@@ -68,7 +68,6 @@ def main():
                 data=filtered_data,
                 storage_format=args["storage_format"],
                 file_path=args["file_path"],
-                incremental=True,  # Always use incremental logic
                 change_results=change_results,
             )
 

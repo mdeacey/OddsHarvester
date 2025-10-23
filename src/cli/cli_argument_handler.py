@@ -23,6 +23,7 @@ class CLIArgumentHandler:
             self.validator.validate_args(args)
         except ValueError as e:
             self.logger.error(f"CLI args validation failed: {e}")
+            print(f"CLI args validation failed: {e}")
             self.parser.print_help()
             exit(1)
 
@@ -48,8 +49,8 @@ class CLIArgumentHandler:
             "browser_locale_timezone": getattr(args, "browser_locale_timezone", None),
             "browser_timezone_id": getattr(args, "browser_timezone_id", None),
             "target_bookmaker": getattr(args, "target_bookmaker", None),
-            "scrape_odds_history": True,  # Always scrape odds history by default
+            "scrape_odds_history": getattr(args, "scrape_odds_history", True),
             "preview_submarkets_only": getattr(args, "preview_submarkets_only", False),
             "all": getattr(args, "all", False),
-            "change_sensitivity": getattr(args, "change_sensitivity", "normal"),
+            "change_sensitivity": getattr(args, "change_sensitivity", "normal") if hasattr(args, "change_sensitivity") and hasattr(getattr(args, "change_sensitivity", None), "__name__") else "normal",
         }

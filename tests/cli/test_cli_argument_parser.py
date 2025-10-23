@@ -184,8 +184,16 @@ def test_parse_scrape_historic_with_all_flag(parser):
 
 
 def test_invalid_sport(parser):
-    with pytest.raises(SystemExit):  # argparse raises SystemExit on invalid args
-        parser.parse_args(["scrape_upcoming", "--sport", "invalid_sport", "--from", "20250225"])
+    # Parser should accept invalid sport now (validation happens in validator)
+    from src.cli.cli_argument_validator import CLIArgumentValidator
+
+    args = parser.parse_args(["scrape_upcoming", "--sport", "invalid_sport", "--from", "20250225"])
+    assert args.sport == "invalid_sport"
+
+    # But validator should reject it
+    validator = CLIArgumentValidator()
+    with pytest.raises(ValueError, match="Invalid sport"):
+        validator.validate_args(args)
 
 
 def test_missing_from_date_for_historic(parser):
@@ -681,13 +689,13 @@ class TestAllFlagIntegrationScenarios:
         from src.cli.cli_argument_validator import CLIArgumentValidator
 
         # Parse args for upcoming with --all
-        args = parser.parse_args(["scrape_upcoming", "--all", "--from", "20231201", "--to", "20231202"])
+        args = parser.parse_args(["scrape_upcoming", "--all", "--from", "now", "--to", "now"])
 
         # Verify parsing worked correctly
         assert args.command == "scrape_upcoming"
         assert args.all is True
-        assert args.from_date == "20231201"
-        assert args.to_date == "20231202"
+        assert args.from_date == "now"
+        assert args.to_date == "now"
         assert args.sport is None
 
         # Verify validation works with --all flag for upcoming
@@ -778,8 +786,7 @@ class TestAllFlagIntegrationScenarios:
         args = parser.parse_args([
             "scrape_historic",
             "--all",
-            "--match_links", "https://www.oddsportal.com/football/match1",
-            "--match_links", "https://www.oddsportal.com/football/match2"
+            "--match_links", "https://www.oddsportal.com/football/match1", "https://www.oddsportal.com/football/match2"
         ])
 
         # Parser should accept these arguments
@@ -818,8 +825,7 @@ class TestAllFlagIntegrationScenarios:
             "--browser_user_agent", "test-agent",
             "--browser_locale_timezone", "UTC",
             "--browser_timezone_id", "UTC",
-            "--proxies", "http://proxy1:8080",
-            "--proxies", "socks5://proxy2:1080",
+            "--proxies", "http://proxy1:8080", "socks5://proxy2:1080",
             "--target_bookmaker", "Bet365"
         ])
 

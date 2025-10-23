@@ -75,7 +75,7 @@ class SportMarketRegistrar:
             lambda extractor,
             page,
             period="FullTime",
-            scrape_odds_history=True,  # Always scrape odds history by default
+            scrape_odds_history=False,  # Default to False for individual market extraction
             target_bookmaker=None,
             preview_submarkets_only=False: extractor.extract_market_odds(
                 page=page,

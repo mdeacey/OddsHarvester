@@ -50,7 +50,14 @@ class LocalDataStorage:
             raise ValueError("Data must be a dictionary or a list of dictionaries.")
 
         target_file_path = file_path or self.default_file_path
-        format_to_use = storage_format.lower() if storage_format else self.default_storage_format.value
+        # Handle both string and StorageFormat enum
+        if storage_format:
+            if isinstance(storage_format, str):
+                format_to_use = storage_format.lower()
+            else:
+                format_to_use = storage_format.value.lower()
+        else:
+            format_to_use = self.default_storage_format.value
 
         if format_to_use not in [f.value for f in StorageFormat]:
             raise ValueError(
@@ -60,8 +67,14 @@ class LocalDataStorage:
         if not target_file_path.endswith(f".{format_to_use}"):
             target_file_path = f"{target_file_path}.{format_to_use}"
 
-        # Always use duplicate detection logic
-        return self.save_incremental_data(data, target_file_path, StorageFormat(format_to_use))
+        # Use appropriate save method based on format
+        if format_to_use == "csv":
+            return self._save_as_csv(data, target_file_path)
+        elif format_to_use == "json":
+            return self._save_as_json(data, target_file_path)
+        else:
+            # Fallback to incremental data for unknown formats
+            return self.save_incremental_data(data, target_file_path, StorageFormat(format_to_use))
 
     def _save_as_csv(self, data: list[dict], file_path: str):
         """Save data in CSV format."""
@@ -80,6 +93,8 @@ class LocalDataStorage:
         except Exception as e:
             self.logger.error(f"Error saving data to {file_path}: {e!s}", exc_info=True)
             raise
+
+        return True
 
     def _save_as_json(self, data: list[dict], file_path: str):
         """Save data in JSON format."""
@@ -104,6 +119,8 @@ class LocalDataStorage:
         except Exception as e:
             self.logger.error(f"Error saving data to {file_path}: {e!s}", exc_info=True)
             raise
+
+        return True
 
     def _ensure_directory_exists(self, file_path: str):
         """Ensures the directory for the given file path exists. If it doesn't exist, creates it."""

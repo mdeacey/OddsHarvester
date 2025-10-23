@@ -86,6 +86,7 @@ def test_parse_and_validate_args_valid(cli_handler):
             "target_bookmaker": None,
             "preview_submarkets_only": False,
             "all": False,
+            "change_sensitivity": "normal",
         }
 
         mock_validate_args.assert_called_once_with(mock_parse_args.return_value)
