@@ -681,18 +681,47 @@ async def _scrape_historic_date_range(scraper, sport: str, league: str, from_dat
         scraper: The scraper instance
         sport: The sport being scraped
         league: The league being scraped
-        from_date: Start season/year string
-        to_date: End season/year string
+        from_date: Start season/year string (None for --all = all available seasons)
+        to_date: End season/year string (None for --all = all available seasons)
         **kwargs: Additional arguments to pass to the scrape function
 
     Returns:
         List of combined results from all seasons
     """
-    try:
-        urls_with_seasons = URLBuilder.get_historic_matches_urls_for_range(sport, from_date, to_date, league)
-    except ValueError as e:
-        logger.error(f"Error generating URLs for season range: {e}")
-        raise
+    # Check if this is --all functionality (no specific date range)
+    is_all_mode = from_date is None and to_date is None
+
+    if is_all_mode:
+        logger.info(f"Auto-discovering available seasons for {sport}/{league}")
+        try:
+            # Try to auto-discover season ranges
+            earliest_year, latest_year = await URLBuilder.discover_available_seasons(
+                sport, league, scraper.page
+            )
+
+            if earliest_year and latest_year:
+                logger.info(f"Discovered season range for {sport}/{league}: {earliest_year} - {latest_year}")
+                # Generate URLs for discovered range
+                urls_with_seasons = []
+                for year in range(earliest_year, latest_year + 1):
+                    season_str = str(year)
+                    url = URLBuilder.get_historic_matches_url(sport, league, season_str)
+                    urls_with_seasons.append((url, season_str))
+            else:
+                logger.warning(f"Auto-discovery failed for {sport}/{league}, using default range")
+                # Fall back to default range
+                urls_with_seasons = URLBuilder.get_all_available_seasons_url_range(sport, league)
+        except Exception as e:
+            logger.warning(f"Season auto-discovery failed for {sport}/{league}: {e}, using default range")
+            # Fall back to default range
+            urls_with_seasons = URLBuilder.get_all_available_seasons_url_range(sport, league)
+    else:
+        # Use specified date range
+        try:
+            urls_with_seasons = URLBuilder.get_historic_matches_urls_for_range(sport, from_date, to_date, league)
+        except ValueError as e:
+            logger.error(f"Error generating URLs for season range: {e}")
+            raise
 
     all_results = []
     failed_seasons = []
