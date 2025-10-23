@@ -31,14 +31,21 @@ class CLIArgumentValidator:
         if hasattr(args, "match_links"):
             errors.extend(self._validate_match_links(match_links=args.match_links, sport=args.sport))
 
-        if hasattr(args, "sport"):
-            errors.extend(self._validate_sport(sport=args.sport))
+        # Conditional validation: bypass sport/markets/leagues validation when --all flag is used without sport
+        should_bypass_validation = (
+            hasattr(args, "all") and args.all and
+            (not hasattr(args, "sport") or args.sport is None)
+        )
 
-        if hasattr(args, "markets"):
-            errors.extend(self._validate_markets(sport=args.sport, markets=args.markets))
+        if not should_bypass_validation:
+            if hasattr(args, "sport"):
+                errors.extend(self._validate_sport(sport=args.sport))
 
-        if hasattr(args, "leagues"):
-            errors.extend(self._validate_leagues(sport=args.sport, leagues=args.leagues))
+            if hasattr(args, "markets"):
+                errors.extend(self._validate_markets(sport=args.sport, markets=args.markets))
+
+            if hasattr(args, "leagues"):
+                errors.extend(self._validate_leagues(sport=args.sport, leagues=args.leagues))
 
         if hasattr(args, "from_date") and hasattr(args, "to_date"):
             errors.extend(
@@ -48,6 +55,7 @@ class CLIArgumentValidator:
                     to_date=args.to_date,
                     match_links=args.match_links,
                     leagues=getattr(args, "leagues", None),
+                    all_flag=getattr(args, "all", False),
                 )
             )
 
@@ -172,13 +180,13 @@ class CLIArgumentValidator:
         return errors
 
     def _validate_date_range(
-        self, command: str, from_date: str | None, to_date: str | None, match_links: list[str] | None, leagues: list[str] | None = None
+        self, command: str, from_date: str | None, to_date: str | None, match_links: list[str] | None, leagues: list[str] | None = None, all_flag: bool = False
     ) -> list[str]:
         """Validates the from/to date range arguments for both upcoming and historic commands."""
         errors = []
 
-        # Date range not required when match_links or leagues is provided
-        if match_links or leagues:
+        # Date range not required when match_links or leagues is provided, but is required for --all flag
+        if match_links or (leagues and not all_flag):
             return errors
 
         if command == "scrape_upcoming":

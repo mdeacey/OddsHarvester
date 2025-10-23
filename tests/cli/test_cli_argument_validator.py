@@ -602,3 +602,222 @@ def test_validate_date_range_with_unlimited_past(validator, mock_args):
         validator.validate_args(mock_args)
     except ValueError as e:
         pytest.fail(f"Unexpected ValueError with unlimited past: {e}")
+
+
+class TestAllFlagConditionalValidation:
+    """Test --all flag conditional validation logic in CLIArgumentValidator."""
+
+    def _create_test_args(self, **kwargs):
+        """Helper method to create test arguments with all required attributes."""
+        import argparse
+
+        defaults = {
+            'command': 'scrape_historic',
+            'all': False,
+            'sport': None,
+            'markets': None,
+            'leagues': None,
+            'from_date': '2023',
+            'to_date': '2024',
+            'storage': 'local',
+            'max_pages': None,
+            'match_links': None,
+            'file_path': None,
+            'format': 'json',
+            'headless': False,
+            'proxies': None,
+            'browser_user_agent': None,
+            'browser_locale_timezone': None,
+            'browser_timezone_id': None,
+            'target_bookmaker': None,
+            'odds_format': 'Decimal Odds',
+            'concurrency_tasks': 3
+        }
+        defaults.update(kwargs)
+        return argparse.Namespace(**defaults)
+
+    def test_validate_args_all_flag_bypasses_sport_validation(self, validator):
+        """Test that --all flag bypasses sport validation when sport is None."""
+        args = self._create_test_args(
+            all=True,
+            sport=None  # Should be bypassed
+        )
+
+        # Should not raise any errors
+        try:
+            validator.validate_args(args)
+        except ValueError as e:
+            pytest.fail(f"Unexpected ValueError when --all flag should bypass sport validation: {e}")
+
+    def test_validate_args_all_flag_bypasses_markets_validation(self, validator):
+        """Test that --all flag bypasses markets validation when sport is None."""
+        args = self._create_test_args(
+            all=True,
+            sport=None,  # Triggers bypass
+            markets=["invalid_market"]  # Normally would cause error
+        )
+
+        # Should not raise errors for invalid markets when bypassed
+        try:
+            validator.validate_args(args)
+        except ValueError as e:
+            pytest.fail(f"Unexpected ValueError when --all flag should bypass markets validation: {e}")
+
+    def test_validate_args_all_flag_bypasses_leagues_validation(self, validator):
+        """Test that --all flag bypasses leagues validation when sport is None."""
+        args = self._create_test_args(
+            all=True,
+            sport=None,  # Triggers bypass
+            leagues=["invalid_league"]  # Normally would cause error
+        )
+
+        # Should not raise errors for invalid leagues when bypassed
+        try:
+            validator.validate_args(args)
+        except ValueError as e:
+            pytest.fail(f"Unexpected ValueError when --all flag should bypass leagues validation: {e}")
+
+    def test_validate_args_all_flag_with_valid_sport_still_validates(self, validator):
+        """Test that --all flag with valid sport still validates normally."""
+        args = self._create_test_args(
+            all=True,
+            sport="football",  # Valid sport
+            markets=["1x2"],
+            leagues=["england-premier-league"]
+        )
+
+        # Should validate normally without errors
+        try:
+            validator.validate_args(args)
+        except ValueError as e:
+            pytest.fail(f"Unexpected ValueError with --all flag and valid sport: {e}")
+
+    def test_validate_args_all_flag_with_invalid_sport_fails(self, validator):
+        """Test that --all flag with invalid sport still fails validation."""
+        args = self._create_test_args(
+            all=True,
+            sport="invalid_sport"  # Invalid sport
+        )
+
+        # Should fail sport validation even with --all flag when sport is provided
+        with pytest.raises(ValueError, match="Invalid sport"):
+            validator.validate_args(args)
+
+    def test_validate_args_no_all_flag_validates_sport_normally(self, validator):
+        """Test that without --all flag, sport validation works normally."""
+        args = self._create_test_args(
+            all=False,  # Explicitly False
+            sport=None  # Missing sport should cause error
+        )
+
+        # Should fail validation for missing sport when --all is False
+        with pytest.raises(ValueError, match="Invalid sport"):
+            validator.validate_args(args)
+
+    def test_validate_args_all_flag_none_treated_as_false(self, validator):
+        """Test that --all flag=None is treated as False for bypass logic."""
+        args = self._create_test_args(
+            all=None,  # None is falsy, should not bypass
+            sport=None  # Missing sport should cause error
+        )
+
+        # Should fail validation when --all is None (falsy)
+        with pytest.raises(ValueError, match="Invalid sport"):
+            validator.validate_args(args)
+
+    def test_validate_args_all_flag_scrape_upcoming_bypass(self, validator):
+        """Test that --all flag bypass works for scrape_upcoming command."""
+        from datetime import datetime, timedelta
+
+        # Use a future date for upcoming command
+        future_date = (datetime.now() + timedelta(days=30)).strftime("%Y%m%d")
+        future_date_plus_one = (datetime.now() + timedelta(days=31)).strftime("%Y%m%d")
+
+        args = self._create_test_args(
+            command="scrape_upcoming",
+            all=True,
+            sport=None,  # Should be bypassed
+            markets=["invalid_market"],  # Should be bypassed
+            leagues=["invalid_league"],  # Should be bypassed
+            from_date=future_date,
+            to_date=future_date_plus_one
+        )
+
+        # Should not raise any errors for upcoming command with --all
+        try:
+            validator.validate_args(args)
+        except ValueError as e:
+            pytest.fail(f"Unexpected ValueError for scrape_upcoming with --all flag: {e}")
+
+    def test_validate_args_all_flag_scrape_upcoming_with_sport_validates(self, validator):
+        """Test that --all flag with sport validates normally for scrape_upcoming."""
+        args = self._create_test_args(
+            command="scrape_upcoming",
+            all=True,
+            sport="invalid_sport",  # Invalid sport
+            from_date="20231201",
+            to_date="20231202"
+        )
+
+        # Should fail validation for invalid sport even with --all flag
+        with pytest.raises(ValueError, match="Invalid sport"):
+            validator.validate_args(args)
+
+    def test_validate_args_all_flag_bypass_conditions(self, validator):
+        """Test specific bypass condition logic."""
+        # Case 1: all=True and sport=None -> should bypass
+        args_bypass = self._create_test_args(
+            all=True,
+            sport=None
+        )
+
+        try:
+            validator.validate_args(args_bypass)
+        except ValueError as e:
+            pytest.fail(f"Bypass condition failed: {e}")
+
+        # Case 2: all=True and sport="football" -> should NOT bypass
+        args_no_bypass = self._create_test_args(
+            all=True,
+            sport="football",
+            markets=["1x2"],
+            leagues=["england-premier-league"]
+        )
+
+        try:
+            validator.validate_args(args_no_bypass)
+        except ValueError as e:
+            pytest.fail(f"No-bypass condition failed unexpectedly: {e}")
+
+        # Case 3: all=False and sport=None -> should NOT bypass
+        args_false = self._create_test_args(
+            all=False,
+            sport=None
+        )
+
+        with pytest.raises(ValueError, match="Invalid sport"):
+            validator.validate_args(args_false)
+
+    def test_validate_args_all_flag_other_validations_still_work(self, validator):
+        """Test that --all flag doesn't bypass other validations (storage, dates, etc.)."""
+        args = self._create_test_args(
+            all=True,
+            sport=None,  # Bypasses sport/markets/leagues validation
+            storage="invalid_storage"  # Should still fail validation
+        )
+
+        # Should fail storage validation even with --all flag
+        with pytest.raises(ValueError, match="Invalid storage type"):
+            validator.validate_args(args)
+
+    def test_validate_args_all_flag_date_validation_integration(self, validator):
+        """Test that --all flag works correctly with date validation."""
+        args = self._create_test_args(
+            all=True,
+            sport=None,  # Bypasses sport validation
+            from_date="invalid_date_format"  # Invalid date
+        )
+
+        # Should still validate dates even with --all flag
+        with pytest.raises(ValueError, match="Invalid.*date"):
+            validator.validate_args(args)

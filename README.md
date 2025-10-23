@@ -111,6 +111,22 @@ You'll find comprehensive support for **hundreds of leagues and tournaments** ac
 
 ## **🛠️ Local Installation**
 
+### **Prerequisites**
+
+- **Python 3.8 - 3.13** (Python 3.12+ recommended for best compatibility)
+  - ⚠️ **Python 3.14 is NOT supported** - Many dependencies like `greenlet` are not yet compatible with Python 3.14
+  - Use Python 3.12 or 3.13 for stable operation
+- **Microsoft C++ Build Tools** (Windows only): Required for building certain Python packages like `greenlet`
+  - Download from: https://visualstudio.microsoft.com/visual-cpp-build-tools/
+  - Run the installer and select **"Desktop development with C++"** workload
+  - **To reduce size (optional)**: In Installation details, keep only:
+    - ✅ MSVC v143 - VS 2022 C++ x64/x86 build tools
+    - ✅ Windows 11 SDK (or latest Windows 10 SDK)
+    - Uncheck optional components like Make tools, Testing tools, C++ address sanitizer, Package manager
+  - This is needed because some dependencies require compilation on Windows
+
+### **Installation Steps**
+
 1. **Clone the repository**:
    Navigate to your desired folder and clone the repository. Then, move into the project directory:
 

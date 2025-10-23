@@ -613,3 +613,233 @@ def test_change_sensitivity_applies_to_both_commands(parser):
         ]
     )
     assert args_historic.change_sensitivity == "aggressive"
+
+
+class TestAllFlagIntegrationScenarios:
+    """Enhanced integration tests for --all flag with validation scenarios."""
+
+    def test_all_flag_parsing_with_validator_integration(self, parser):
+        """Test that --all flag parsing integrates properly with validation pipeline."""
+        from src.cli.cli_argument_validator import CLIArgumentValidator
+
+        # Parse args with --all flag
+        args = parser.parse_args(["scrape_historic", "--all", "--from", "2023"])
+
+        # Verify parsing worked correctly
+        assert args.command == "scrape_historic"
+        assert args.all is True
+        assert args.from_date == "2023"
+        assert args.sport is None  # Should be None when --all is used
+
+        # Verify validation works with --all flag
+        validator = CLIArgumentValidator()
+        try:
+            validator.validate_args(args)
+        except ValueError as e:
+            pytest.fail(f"Validation failed unexpectedly with --all flag: {e}")
+
+    def test_all_flag_with_sport_validation_integration(self, parser):
+        """Test that --all flag with provided sport integrates correctly with validation."""
+        from src.cli.cli_argument_validator import CLIArgumentValidator
+
+        # Parse args with --all flag and valid sport
+        args = parser.parse_args(["scrape_historic", "--all", "--sport", "football", "--from", "2023"])
+
+        # Verify parsing worked correctly
+        assert args.command == "scrape_historic"
+        assert args.all is True
+        assert args.sport == "football"
+        assert args.from_date == "2023"
+
+        # Verify validation works normally when sport is provided with --all
+        validator = CLIArgumentValidator()
+        try:
+            validator.validate_args(args)
+        except ValueError as e:
+            pytest.fail(f"Validation failed unexpectedly with --all flag and valid sport: {e}")
+
+    def test_all_flag_with_invalid_sport_validation_fails(self, parser):
+        """Test that --all flag with invalid sport fails validation properly."""
+        from src.cli.cli_argument_validator import CLIArgumentValidator
+
+        # Parse args with --all flag and invalid sport
+        args = parser.parse_args(["scrape_historic", "--all", "--sport", "invalid_sport", "--from", "2023"])
+
+        # Verify parsing worked (parser doesn't validate sport)
+        assert args.command == "scrape_historic"
+        assert args.all is True
+        assert args.sport == "invalid_sport"
+        assert args.from_date == "2023"
+
+        # Verify validation fails for invalid sport even with --all flag
+        validator = CLIArgumentValidator()
+        with pytest.raises(ValueError, match="Invalid sport"):
+            validator.validate_args(args)
+
+    def test_all_flag_upcoming_command_validation(self, parser):
+        """Test --all flag integration with scrape_upcoming command validation."""
+        from src.cli.cli_argument_validator import CLIArgumentValidator
+
+        # Parse args for upcoming with --all
+        args = parser.parse_args(["scrape_upcoming", "--all", "--from", "20231201", "--to", "20231202"])
+
+        # Verify parsing worked correctly
+        assert args.command == "scrape_upcoming"
+        assert args.all is True
+        assert args.from_date == "20231201"
+        assert args.to_date == "20231202"
+        assert args.sport is None
+
+        # Verify validation works with --all flag for upcoming
+        validator = CLIArgumentValidator()
+        try:
+            validator.validate_args(args)
+        except ValueError as e:
+            pytest.fail(f"Validation failed unexpectedly for scrape_upcoming with --all flag: {e}")
+
+    def test_all_flag_complex_argument_parsing(self, parser):
+        """Test --all flag with complex argument combinations."""
+        args = parser.parse_args([
+            "scrape_historic",
+            "--all",
+            "--from", "2023-2024",
+            "--to", "2024-2025",
+            "--max_pages", "10",
+            "--storage", "remote",
+            "--format", "json",
+            "--headless",
+            "--change_sensitivity", "aggressive",
+            "--odds_format", "Fractional Odds",
+            "--concurrency_tasks", "5"
+        ])
+
+        # Verify all arguments parsed correctly
+        assert args.command == "scrape_historic"
+        assert args.all is True
+        assert args.from_date == "2023-2024"
+        assert args.to_date == "2024-2025"
+        assert args.max_pages == 10
+        assert args.storage == "remote"
+        assert args.format == "json"
+        assert args.headless is True
+        assert args.change_sensitivity == "aggressive"
+        assert args.odds_format == "Fractional Odds"
+        assert args.concurrency_tasks == 5
+        assert args.sport is None
+
+    def test_all_flag_with_leagues_and_markets_parsing(self, parser):
+        """Test --all flag with leagues and markets arguments (parser should accept them)."""
+        args = parser.parse_args([
+            "scrape_historic",
+            "--all",
+            "--from", "2023",
+            "--leagues", "some-league",
+            "--markets", "1x2,btts"
+        ])
+
+        # Verify parsing works (validator will handle conditional logic)
+        assert args.command == "scrape_historic"
+        assert args.all is True
+        assert args.from_date == "2023"
+        assert args.leagues == ["some-league"]
+        assert args.markets == ["1x2", "btts"]
+        assert args.sport is None
+
+    def test_all_flag_defaults_without_dates(self, parser):
+        """Test --all flag behavior when no dates are provided."""
+        args = parser.parse_args(["scrape_upcoming", "--all"])
+
+        assert args.command == "scrape_upcoming"
+        assert args.all is True
+        assert args.from_date is None
+        assert args.to_date is None
+        assert args.sport is None
+
+    def test_all_flag_position_independent(self, parser):
+        """Test that --all flag position doesn't affect parsing."""
+        # Test --all at the beginning
+        args1 = parser.parse_args(["scrape_historic", "--all", "--from", "2023"])
+
+        # Test --all in the middle
+        args2 = parser.parse_args(["scrape_historic", "--from", "2023", "--all"])
+
+        # Test --all at the end
+        args3 = parser.parse_args(["scrape_historic", "--from", "2023", "--all"])
+
+        # All should parse identically
+        for args in [args1, args2, args3]:
+            assert args.command == "scrape_historic"
+            assert args.all is True
+            assert args.from_date == "2023"
+            assert args.sport is None
+
+    def test_all_flag_with_match_links_parser_behavior(self, parser):
+        """Test that parser accepts --all flag with match_links (validation will handle)."""
+        args = parser.parse_args([
+            "scrape_historic",
+            "--all",
+            "--match_links", "https://www.oddsportal.com/football/match1",
+            "--match_links", "https://www.oddsportal.com/football/match2"
+        ])
+
+        # Parser should accept these arguments
+        assert args.command == "scrape_historic"
+        assert args.all is True
+        assert len(args.match_links) == 2
+        assert args.sport is None
+
+    def test_all_flag_boolean_variations_parser(self, parser):
+        """Test parser behavior with different boolean contexts for --all flag."""
+        # Parser always treats --all as action="store_true", so it should always be True when present
+        args = parser.parse_args(["scrape_historic", "--all", "--from", "2023"])
+        assert args.all is True
+
+    def test_no_all_flag_defaults_to_false(self, parser):
+        """Test that default value for --all flag is False when not provided."""
+        args = parser.parse_args(["scrape_historic", "--from", "2023"])
+        assert args.all is False
+
+    def test_all_flag_with_all_optional_arguments(self, parser):
+        """Test --all flag with all optional arguments to ensure no conflicts."""
+        args = parser.parse_args([
+            "scrape_historic",
+            "--all",
+            "--from", "2023",
+            "--to", "2024",
+            "--max_pages", "15",
+            "--storage", "local",
+            "--format", "csv",
+            "--file_path", "all_sports_data.csv",
+            "--headless",
+            "--save_logs",
+            "--change_sensitivity", "conservative",
+            "--odds_format", "Decimal Odds",
+            "--concurrency_tasks", "8",
+            "--browser_user_agent", "test-agent",
+            "--browser_locale_timezone", "UTC",
+            "--browser_timezone_id", "UTC",
+            "--proxies", "http://proxy1:8080",
+            "--proxies", "socks5://proxy2:1080",
+            "--target_bookmaker", "Bet365"
+        ])
+
+        # Verify all arguments parsed correctly
+        assert args.command == "scrape_historic"
+        assert args.all is True
+        assert args.sport is None
+        assert args.from_date == "2023"
+        assert args.to_date == "2024"
+        assert args.max_pages == 15
+        assert args.storage == "local"
+        assert args.format == "csv"
+        assert args.file_path == "all_sports_data.csv"
+        assert args.headless is True
+        assert args.save_logs is True
+        assert args.change_sensitivity == "conservative"
+        assert args.odds_format == "Decimal Odds"
+        assert args.concurrency_tasks == 8
+        assert args.browser_user_agent == "test-agent"
+        assert args.browser_locale_timezone == "UTC"
+        assert args.browser_timezone_id == "UTC"
+        assert len(args.proxies) == 2
+        assert args.target_bookmaker == "Bet365"
