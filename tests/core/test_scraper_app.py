@@ -980,3 +980,81 @@ async def test_scrape_single_league_date_range_with_auto_discovery():
     assert len(result) == 1
     assert result[0]["sport"] == "football"
     assert result[0]["auto_discovered"] is True
+
+
+@pytest.mark.asyncio
+async def test_scrape_historic_date_range_all_functionality():
+    """Test _scrape_historic_date_range with --all functionality (None dates)."""
+    from src.core.scraper_app import _scrape_historic_date_range
+    from src.core.url_builder import URLBuilder
+    from unittest.mock import AsyncMock
+
+    scraper_mock = MagicMock()
+    scraper_mock.page = AsyncMock()
+
+    # Mock successful season discovery
+    async def mock_discover_seasons(sport, league, page):
+        return 2020, 2022  # Discovered range 2020-2022
+
+    # Mock the scraper's scrape_historic method
+    async def mock_scrape_historic(**kwargs):
+        season = kwargs.get('season', '2020')
+        return [{"league": kwargs.get('league'), "season": season, "data": f"match_data_{season}"}]
+
+    scraper_mock.scrape_historic = mock_scrape_historic
+
+    with patch.object(URLBuilder, 'discover_available_seasons', side_effect=mock_discover_seasons):
+        result = await _scrape_historic_date_range(
+            scraper=scraper_mock,
+            sport="football",
+            league="england-premier-league",
+            from_date=None,  # --all mode
+            to_date=None     # --all mode
+        )
+
+    # Should have discovered seasons 2020, 2021, 2022
+    assert len(result) == 3
+
+    # Check that data from all seasons is included
+    seasons = [item["season"] for item in result]
+    assert "2020" in seasons
+    assert "2021" in seasons
+    assert "2022" in seasons
+
+
+@pytest.mark.asyncio
+async def test_scrape_historic_date_range_all_functionality_fallback():
+    """Test _scrape_historic_date_range --all functionality when discovery fails."""
+    from src.core.scraper_app import _scrape_historic_date_range
+    from src.core.url_builder import URLBuilder
+    from unittest.mock import AsyncMock
+
+    scraper_mock = MagicMock()
+    scraper_mock.page = AsyncMock()
+
+    # Mock failed season discovery (returns None, None)
+    async def mock_discover_seasons_fail(sport, league, page):
+        return None, None
+
+    # Mock the scraper's scrape_historic method
+    async def mock_scrape_historic(**kwargs):
+        season = kwargs.get('season', '1998')
+        return [{"league": kwargs.get('league'), "season": season, "data": f"fallback_data_{season}"}]
+
+    scraper_mock.scrape_historic = mock_scrape_historic
+
+    with patch.object(URLBuilder, 'discover_available_seasons', side_effect=mock_discover_seasons_fail):
+        result = await _scrape_historic_date_range(
+            scraper=scraper_mock,
+            sport="football",
+            league="england-premier-league",
+            from_date=None,  # --all mode
+            to_date=None     # --all mode
+        )
+
+    # Should fall back to default range and get some results
+    assert len(result) > 0
+
+    # Should have data from default range (starting 1998)
+    seasons = [item["season"] for item in result]
+    assert "1998" in seasons
