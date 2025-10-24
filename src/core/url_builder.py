@@ -185,8 +185,9 @@ class URLBuilder:
                 start_season_data = URLBuilder._parse_season_for_url(from_date)
                 start_year = start_season_data[1]
             else:
-                # For --all functionality, start from earlier year to capture more historical data
-                start_year = 1998  # More reasonable starting point for most sports leagues
+                # For --all functionality, dynamic discovery will handle the actual seasons
+                # No hardcoded years needed - scraper will use exact discovered seasons
+                start_year = None  # Will be handled by dynamic discovery in scraper
 
             if to_date:
                 end_season_data = URLBuilder._parse_season_for_url(to_date)
@@ -196,6 +197,11 @@ class URLBuilder:
                 end_year = datetime.now().year + 1
         except ValueError as e:
             raise ValueError(f"Invalid season format: {e}")
+
+        # For --all functionality, this method shouldn't be used anymore
+        # The scraper should use exact seasons discovery instead
+        if start_year is None:
+            raise ValueError("get_historic_matches_urls_for_range cannot be used with None start_year. Use exact seasons discovery instead.")
 
         if end_year < start_year:
             raise ValueError("End season/year cannot be before start season/year")
@@ -249,9 +255,9 @@ class URLBuilder:
         )
 
     @staticmethod
-    async def discover_available_seasons(sport: str, league: str, page, discovered_leagues: Dict[str, str] | None = None) -> Tuple[Optional[int], Optional[int]]:
+    async def discover_available_seasons(sport: str, league: str, page, discovered_leagues: Dict[str, str] | None = None) -> Optional[List[int]]:
         """
-        Auto-discover the earliest and latest available seasons for a league.
+        Auto-discover the exact available seasons for a league.
 
         Args:
             sport (str): The sport name
@@ -260,7 +266,7 @@ class URLBuilder:
             discovered_leagues (Optional[Dict[str, str]]): Dynamically discovered leagues mapping.
 
         Returns:
-            Tuple[Optional[int], Optional[int]]: (earliest_year, latest_year) or (None, None) if discovery fails
+            Optional[List[int]]: List of discovered seasons in chronological order, or None if discovery fails
         """
         logger = logging.getLogger(__name__)
 
@@ -344,22 +350,17 @@ class URLBuilder:
                 logger.debug(f"Found seasons from content: {sorted(seasons_found)}")
 
             if seasons_found:
-                earliest_year = min(seasons_found)
-                latest_year = max(seasons_found)
+                sorted_seasons = sorted(seasons_found)
 
-                # Add some buffer years to ensure we don't miss data
-                earliest_year = max(earliest_year - 1, 1995)  # Don't go before 1995
-                latest_year = latest_year + 2  # Include potential future seasons
-
-                logger.info(f"Discovered season range for {sport}/{league}: {earliest_year} - {latest_year}")
-                return earliest_year, latest_year
+                logger.info(f"Discovered {len(sorted_seasons)} exact seasons for {sport}/{league}: {sorted_seasons}")
+                return sorted_seasons
             else:
-                logger.warning(f"Could not discover seasons for {sport}/{league} - using default range")
-                return None, None
+                # If no seasons found on a valid league page, this indicates a real problem
+                raise ValueError(f"No seasons discovered on league page for {sport}/{league}. League exists but no season data found.")
 
         except Exception as e:
             logger.error(f"Error discovering seasons for {sport}/{league}: {e}")
-            return None, None
+            raise  # Re-raise the exception - don't hide real problems
 
     @staticmethod
     async def discover_leagues_for_sport(sport: str, page) -> Dict[str, str]:
@@ -655,7 +656,7 @@ class URLBuilder:
         return leagues
 
     @staticmethod
-    def get_all_available_seasons_url_range(sport: str, league: str, fallback_start_year: int = 1998, fallback_end_year: Optional[int] = None, discovered_leagues: Dict[str, str] | None = None) -> List[Tuple[str, str]]:
+    def get_all_available_seasons_url_range(sport: str, league: str, fallback_start_year: int = 2010, fallback_end_year: Optional[int] = None, discovered_leagues: Dict[str, str] | None = None) -> List[Tuple[str, str]]:
         """
         Generate URLs for ALL available seasons for a league.
         Uses auto-discovery when possible, falls back to reasonable defaults.
@@ -663,22 +664,43 @@ class URLBuilder:
         Args:
             sport (str): The sport name
             league (str): The league identifier
-            fallback_start_year (int): Fallback start year if auto-discovery fails
-            fallback_end_year (int): Fallback end year if auto-discovery fails (defaults to current year + 2)
+            fallback_start_year (int): Fallback start year if auto-discovery fails (updated to 2010)
+            fallback_end_year (int): Fallback end year if auto-discovery fails (defaults to current year + 1)
             discovered_leagues (Optional[Dict[str, str]]): Dynamically discovered leagues mapping.
 
         Returns:
             List[Tuple[str, str]]: List of (url, season_string) tuples for all available seasons
         """
         if fallback_end_year is None:
-            fallback_end_year = datetime.now().year + 2  # Include current + next year
+            fallback_end_year = datetime.now().year + 1  # More conservative end year
 
         # This is a synchronous version - the actual discovery will happen async in the scraper
-        # For now, return a wide range that will be filtered by the actual scraper
+        # Return a reasonable range that minimizes failed requests
         urls = []
         for year in range(fallback_start_year, fallback_end_year + 1):
             season_str = str(year)
             url = URLBuilder.get_historic_matches_url(sport, league, season_str, discovered_leagues)
             urls.append((url, season_str))
 
+        return urls
+
+    @staticmethod
+    def get_urls_for_specific_seasons(sport: str, league: str, seasons: List[int], discovered_leagues: Dict[str, str] | None = None) -> List[Tuple[str, str]]:
+        """
+        Generate URLs for a specific list of seasons.
+
+        Args:
+            sport (str): The sport name
+            league (str): The league identifier
+            seasons (List[int]): List of specific seasons to generate URLs for
+            discovered_leagues (Optional[Dict[str, str]]): Dynamically discovered leagues mapping
+
+        Returns:
+            List[Tuple[str, str]]: List of (url, season_string) tuples for the specified seasons
+        """
+        urls = []
+        for season in seasons:
+            season_str = str(season)
+            url = URLBuilder.get_historic_matches_url(sport, league, season_str, discovered_leagues)
+            urls.append((url, season_str))
         return urls

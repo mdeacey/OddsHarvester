@@ -1048,9 +1048,9 @@ async def test_scrape_historic_date_range_all_functionality():
         "england-premier-league": "https://www.oddsportal.com/football/england/premier-league"
     }
 
-    # Mock successful season discovery
+    # Mock successful season discovery - returns exact seasons
     async def mock_discover_seasons(sport, league, page, discovered_leagues=None):
-        return 2020, 2022  # Discovered range 2020-2022
+        return [2020, 2021, 2022]  # Discovered exact seasons
 
     # Mock the scraper's scrape_historic method
     async def mock_scrape_historic(**kwargs):
@@ -1069,10 +1069,10 @@ async def test_scrape_historic_date_range_all_functionality():
             discovered_leagues=discovered_leagues
         )
 
-    # Should have discovered seasons 2020, 2021, 2022
+    # Should have discovered seasons 2020, 2021, 2022 (exact seasons)
     assert len(result) == 3
 
-    # Check that data from all seasons is included
+    # Check that data from all exact seasons is included
     seasons = [item["season"] for item in result]
     assert "2020" in seasons
     assert "2021" in seasons
@@ -1094,30 +1094,103 @@ async def test_scrape_historic_date_range_all_functionality_fallback():
         "england-premier-league": "https://www.oddsportal.com/football/england/premier-league"
     }
 
-    # Mock failed season discovery (returns None, None)
+    # Mock failed season discovery (raises error as expected)
     async def mock_discover_seasons_fail(sport, league, page, discovered_leagues=None):
-        return None, None
+        raise ValueError("No seasons discovered on league page")
+
+    with patch.object(URLBuilder, 'discover_available_seasons', side_effect=mock_discover_seasons_fail):
+        # Should raise error when season discovery fails
+        with pytest.raises(ValueError, match="No seasons discovered on league page"):
+            await _scrape_historic_date_range(
+                scraper=scraper_mock,
+                sport="football",
+                league="england-premier-league",
+                from_date=None,  # --all mode
+                to_date=None,    # --all mode
+                discovered_leagues=discovered_leagues
+            )
+
+
+@pytest.mark.asyncio
+async def test_scrape_historic_date_range_africa_cup_optimization():
+    """Test _scrape_historic_date_range with Africa Cup of Nations exact seasons."""
+    from src.core.scraper_app import _scrape_historic_date_range
+    from src.core.url_builder import URLBuilder
+    from unittest.mock import AsyncMock
+
+    scraper_mock = MagicMock()
+    scraper_mock.page = AsyncMock()
+
+    # Mock discovered leagues
+    discovered_leagues = {
+        "africa-cup-of-nations": "https://www.oddsportal.com/football/africa-cup-of-nations"
+    }
+
+    # Mock Africa Cup of Nations exact seasons (irregular schedule)
+    async def mock_discover_seasons_africa_cup(sport, league, page, discovered_leagues=None):
+        return [2008, 2010, 2012, 2013, 2015, 2017, 2019, 2021, 2023, 2025]
 
     # Mock the scraper's scrape_historic method
     async def mock_scrape_historic(**kwargs):
-        season = kwargs.get('season', '1998')
-        return [{"league": kwargs.get('league'), "season": season, "data": f"fallback_data_{season}"}]
+        season = kwargs.get('season', '2023')
+        return [{"league": kwargs.get('league'), "season": season, "data": f"africa_cup_data_{season}"}]
 
     scraper_mock.scrape_historic = mock_scrape_historic
 
-    with patch.object(URLBuilder, 'discover_available_seasons', side_effect=mock_discover_seasons_fail):
+    with patch.object(URLBuilder, 'discover_available_seasons', side_effect=mock_discover_seasons_africa_cup):
         result = await _scrape_historic_date_range(
             scraper=scraper_mock,
             sport="football",
-            league="england-premier-league",
+            league="africa-cup-of-nations",
             from_date=None,  # --all mode
             to_date=None,    # --all mode
             discovered_leagues=discovered_leagues
         )
 
-    # Should fall back to default range and get some results
-    assert len(result) > 0
+    # Should have discovered exact Africa Cup seasons (not continuous range)
+    assert len(result) == 10
 
-    # Should have data from default range (starting 1998)
+    # Check that data from all exact seasons is included
     seasons = [item["season"] for item in result]
-    assert "1998" in seasons
+    expected_seasons = ["2008", "2010", "2012", "2013", "2015", "2017", "2019", "2021", "2023", "2025"]
+
+    for season in expected_seasons:
+        assert season in seasons, f"Season {season} should be included"
+
+    # Verify no extra seasons were scraped (no 2009, 2011, etc.)
+    assert len(result) == len(expected_seasons)
+
+
+@pytest.mark.asyncio
+async def test_get_urls_for_specific_seasons_integration():
+    """Test the new get_urls_for_specific_seasons method integration."""
+    from src.core.scraper_app import _scrape_historic_date_range
+    from src.core.url_builder import URLBuilder
+    from unittest.mock import AsyncMock
+
+    # Test the URL generation method directly
+    discovered_leagues = {
+        "england-premier-league": "https://www.oddsportal.com/football/england/premier-league"
+    }
+
+    # Test irregular seasons like World Cup
+    world_cup_seasons = [2010, 2014, 2018, 2022]
+    urls_with_seasons = URLBuilder.get_urls_for_specific_seasons(
+        sport="football",
+        league="england-premier-league",  # Using a test league
+        seasons=world_cup_seasons,
+        discovered_leagues=discovered_leagues
+    )
+
+    # Should generate URLs for each specific season
+    assert len(urls_with_seasons) == 4
+
+    # Check URL format and season mapping
+    for url, season_str in urls_with_seasons:
+        expected_url = f"https://www.oddsportal.com/football/england/premier-league-{season_str}/results/"
+        assert url == expected_url
+        assert season_str in ["2010", "2014", "2018", "2022"]
+
+    # Verify only the requested seasons are included
+    generated_seasons = [season for _, season in urls_with_seasons]
+    assert sorted(generated_seasons) == sorted(["2010", "2014", "2018", "2022"])

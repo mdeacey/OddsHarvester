@@ -727,29 +727,19 @@ async def _scrape_historic_date_range(scraper, sport: str, league: str, from_dat
     is_all_mode = from_date is None and to_date is None
 
     if is_all_mode:
-        logger.info(f"Auto-discovering available seasons for {sport}/{league}")
+        logger.info(f"Auto-discovering exact available seasons for {sport}/{league}")
         try:
-            # Try to auto-discover season ranges
-            earliest_year, latest_year = await URLBuilder.discover_available_seasons(
+            # Try to auto-discover exact seasons
+            discovered_seasons = await URLBuilder.discover_available_seasons(
                 sport, league, scraper.page, discovered_leagues
             )
 
-            if earliest_year and latest_year:
-                logger.info(f"Discovered season range for {sport}/{league}: {earliest_year} - {latest_year}")
-                # Generate URLs for discovered range
-                urls_with_seasons = []
-                for year in range(earliest_year, latest_year + 1):
-                    season_str = str(year)
-                    url = URLBuilder.get_historic_matches_url(sport, league, season_str, discovered_leagues)
-                    urls_with_seasons.append((url, season_str))
-            else:
-                logger.warning(f"Auto-discovery failed for {sport}/{league}, using default range")
-                # Fall back to default range
-                urls_with_seasons = URLBuilder.get_all_available_seasons_url_range(sport, league, discovered_leagues=discovered_leagues)
+            # Generate URLs for discovered seasons (no wasted requests)
+            urls_with_seasons = URLBuilder.get_urls_for_specific_seasons(sport, league, discovered_seasons, discovered_leagues)
         except Exception as e:
-            logger.warning(f"Season auto-discovery failed for {sport}/{league}: {e}, using default range")
-            # Fall back to default range
-            urls_with_seasons = URLBuilder.get_all_available_seasons_url_range(sport, league, discovered_leagues=discovered_leagues)
+            logger.error(f"Season auto-discovery failed for {sport}/{league}: {e}")
+            # No fallback - if discovery fails on a valid league, there's a real problem
+            raise
     else:
         # Use specified date range
         try:
