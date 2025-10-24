@@ -1,33 +1,26 @@
 import pytest
 from datetime import datetime
-from unittest.mock import patch
+from unittest.mock import patch, AsyncMock, MagicMock
+from bs4 import BeautifulSoup
 
 from src.core.url_builder import URLBuilder
 from src.utils.constants import ODDSPORTAL_BASE_URL
-from src.utils.sport_league_constants import SPORTS_LEAGUES_URLS_MAPPING
 from src.utils.sport_market_constants import Sport
 
-# Create test mapping for sports and leagues (don't modify global)
-TEST_SPORTS_LEAGUES_URLS_MAPPING = {
-    Sport.FOOTBALL: {
-        "england-premier-league": f"{ODDSPORTAL_BASE_URL}/football/england/premier-league",
-        "la-liga": f"{ODDSPORTAL_BASE_URL}/football/spain/la-liga",
-    },
-    Sport.TENNIS: {
-        "atp-tour": f"{ODDSPORTAL_BASE_URL}/tennis/atp-tour",
-    },
-    Sport.BASEBALL: {
-        "mlb": f"{ODDSPORTAL_BASE_URL}/baseball/usa/mlb",
-        "japan-npb": f"{ODDSPORTAL_BASE_URL}/baseball/japan/npb",
-    },
+# Create test discovered leagues mapping (simulating dynamic discovery results)
+TEST_DISCOVERED_LEAGUES = {
+    "england-premier-league": f"{ODDSPORTAL_BASE_URL}/football/england/premier-league",
+    "la-liga": f"{ODDSPORTAL_BASE_URL}/football/spain/la-liga",
+    "atp-tour": f"{ODDSPORTAL_BASE_URL}/tennis/atp-tour",
+    "mlb": f"{ODDSPORTAL_BASE_URL}/baseball/usa/mlb",
+    "japan-npb": f"{ODDSPORTAL_BASE_URL}/baseball/japan/npb",
 }
 
 
-@pytest.fixture(autouse=True)
-def mock_sport_league_urls_mapping():
-    """Mock the SPORTS_LEAGUES_URLS_MAPPING to use test data."""
-    with patch('src.core.url_builder.SPORTS_LEAGUES_URLS_MAPPING', TEST_SPORTS_LEAGUES_URLS_MAPPING):
-        yield
+@pytest.fixture
+def discovered_leagues():
+    """Provide test discovered leagues for URLBuilder tests."""
+    return TEST_DISCOVERED_LEAGUES.copy()
 
 
 @pytest.mark.parametrize(
@@ -51,9 +44,9 @@ def mock_sport_league_urls_mapping():
         ("baseball", "japan-npb", "2024-2025", f"{ODDSPORTAL_BASE_URL}/baseball/japan/npb-2024/results/"),
     ],
 )
-def test_get_historic_matches_url(sport, league, season, expected_url):
+def test_get_historic_matches_url(sport, league, season, expected_url, discovered_leagues):
     """Test building URLs for historical matches with various inputs."""
-    assert URLBuilder.get_historic_matches_url(sport, league, season) == expected_url
+    assert URLBuilder.get_historic_matches_url(sport, league, season, discovered_leagues) == expected_url
 
 
 @pytest.mark.parametrize(
@@ -92,10 +85,10 @@ def test_get_historic_matches_url(sport, league, season, expected_url):
         ),
     ],
 )
-def test_get_historic_matches_url_invalid_season_format(sport, league, season, error_msg):
+def test_get_historic_matches_url_invalid_season_format(sport, league, season, error_msg, discovered_leagues):
     """Test invalid season formats."""
     with pytest.raises(ValueError, match=error_msg):
-        URLBuilder.get_historic_matches_url(sport, league, season)
+        URLBuilder.get_historic_matches_url(sport, league, season, discovered_leagues)
 
 
 @pytest.mark.parametrize(
@@ -116,25 +109,19 @@ def test_get_historic_matches_url_invalid_season_format(sport, league, season, e
         ),
     ],
 )
-def test_get_historic_matches_url_invalid_season_range(sport, league, season, error_msg):
+def test_get_historic_matches_url_invalid_season_range(sport, league, season, error_msg, discovered_leagues):
     """Test invalid season ranges."""
     with pytest.raises(ValueError, match=error_msg):
-        URLBuilder.get_historic_matches_url(sport, league, season)
+        URLBuilder.get_historic_matches_url(sport, league, season, discovered_leagues)
 
 
-def test_get_historic_matches_url_invalid_sport():
-    """Test error handling for invalid sports."""
-    with pytest.raises(ValueError, match="'nonexistent_sport' is not a valid Sport"):
-        URLBuilder.get_historic_matches_url("nonexistent_sport", "champions-league", "2023-2024")
-
-
-def test_get_historic_matches_url_invalid_league():
+def test_get_historic_matches_url_invalid_league(discovered_leagues):
     """Test error handling for invalid leagues."""
     with pytest.raises(
         ValueError,
-        match="Invalid league 'random-league' for sport 'football'. Available: england-premier-league, la-liga",
+        match="Invalid league 'random-league' for sport 'football'. Available: england-premier-league, la-liga, atp-tour, mlb, japan-npb",
     ):
-        URLBuilder.get_historic_matches_url("football", "random-league", "2023-2024")
+        URLBuilder.get_historic_matches_url("football", "random-league", "2023-2024", discovered_leagues)
 
 
 @pytest.mark.parametrize(
@@ -151,14 +138,14 @@ def test_get_historic_matches_url_invalid_league():
         ("football", "", None, None),  # Special case handled in test function
     ],
 )
-def test_get_upcoming_matches_url(sport, date, league, expected_url):
+def test_get_upcoming_matches_url(sport, date, league, expected_url, discovered_leagues):
     """Test building URLs for upcoming matches with various inputs."""
     if date is None or date == "":
         # Don't test the exact URL since it depends on today's date
-        result = URLBuilder.get_upcoming_matches_url(sport, date, league)
+        result = URLBuilder.get_upcoming_matches_url(sport, date, league, discovered_leagues)
         assert result.startswith(f"{ODDSPORTAL_BASE_URL}/matches/")
     else:
-        assert URLBuilder.get_upcoming_matches_url(sport, date, league) == expected_url
+        assert URLBuilder.get_upcoming_matches_url(sport, date, league, discovered_leagues) == expected_url
 
 
 @pytest.mark.parametrize(
@@ -169,24 +156,18 @@ def test_get_upcoming_matches_url(sport, date, league, expected_url):
         ("baseball", "mlb", f"{ODDSPORTAL_BASE_URL}/baseball/usa/mlb"),
     ],
 )
-def test_get_league_url(sport, league, expected_url):
+def test_get_league_url(sport, league, expected_url, discovered_leagues):
     """Test retrieving league URLs."""
-    assert URLBuilder.get_league_url(sport, league) == expected_url
+    assert URLBuilder.get_league_url(sport, league, discovered_leagues) == expected_url
 
 
-def test_get_league_url_invalid_sport():
-    """Test get_league_url raises ValueError for unsupported sport."""
-    with pytest.raises(ValueError, match="'nonexistent_sport' is not a valid Sport"):
-        URLBuilder.get_league_url("nonexistent_sport", "champions-league")
-
-
-def test_get_league_url_invalid_league():
+def test_get_league_url_invalid_league(discovered_leagues):
     """Test get_league_url raises ValueError for unsupported league."""
     with pytest.raises(
         ValueError,
         match="Invalid league 'random-league' for sport 'football'. Available: england-premier-league, la-liga",
     ):
-        URLBuilder.get_league_url("football", "random-league")
+        URLBuilder.get_league_url("football", "random-league", discovered_leagues)
 
 
 # Tests for new date range URL generation methods
@@ -221,10 +202,10 @@ class TestGetUpcomingMatchesUrlsForRange:
             assert url == f"{ODDSPORTAL_BASE_URL}/matches/football/{date_str}/"
             assert date_str in ["2025-01-01", "2025-01-02", "2025-01-03"]
 
-    def test_date_range_with_league(self):
+    def test_date_range_with_league(self, discovered_leagues):
         """Test generating URLs for date range with specific league."""
         urls_with_dates = URLBuilder.get_upcoming_matches_urls_for_range(
-            sport="football", from_date="20250101", to_date="20250102", league="england-premier-league"
+            sport="football", from_date="20250101", to_date="20250102", league="england-premier-league", discovered_leagues=discovered_leagues
         )
         assert len(urls_with_dates) == 2
 
@@ -261,20 +242,20 @@ class TestGetUpcomingMatchesUrlsForRange:
 class TestGetHistoricMatchesUrlsForRange:
     """Test the get_historic_matches_urls_for_range method."""
 
-    def test_single_season_range(self):
+    def test_single_season_range(self, discovered_leagues):
         """Test generating URLs for a single season."""
         urls_with_seasons = URLBuilder.get_historic_matches_urls_for_range(
-            sport="football", from_date="2023", to_date="2023", league="england-premier-league"
+            sport="football", from_date="2023", to_date="2023", league="england-premier-league", discovered_leagues=discovered_leagues
         )
         assert len(urls_with_seasons) == 1
         url, season_str = urls_with_seasons[0]
         assert url == f"{ODDSPORTAL_BASE_URL}/football/england/premier-league-2023/results/"
         assert season_str == "2023"
 
-    def test_multi_season_range(self):
+    def test_multi_season_range(self, discovered_leagues):
         """Test generating URLs for multiple seasons."""
         urls_with_seasons = URLBuilder.get_historic_matches_urls_for_range(
-            sport="football", from_date="2021", to_date="2023", league="england-premier-league"
+            sport="football", from_date="2021", to_date="2023", league="england-premier-league", discovered_leagues=discovered_leagues
         )
         assert len(urls_with_seasons) == 3
 
@@ -289,10 +270,10 @@ class TestGetHistoricMatchesUrlsForRange:
             assert url == f"{ODDSPORTAL_BASE_URL}/football/england/premier-league-{season_str}/results/"
             assert season_str in ["2021", "2022", "2023"]
 
-    def test_season_range_with_hyphenated_seasons(self):
+    def test_season_range_with_hyphenated_seasons(self, discovered_leagues):
         """Test generating URLs with hyphenated season format."""
         urls_with_seasons = URLBuilder.get_historic_matches_urls_for_range(
-            sport="tennis", from_date="2022-2023", to_date="2023-2024", league="atp-tour"
+            sport="tennis", from_date="2022-2023", to_date="2023-2024", league="atp-tour", discovered_leagues=discovered_leagues
         )
         assert len(urls_with_seasons) == 2
 
@@ -301,36 +282,36 @@ class TestGetHistoricMatchesUrlsForRange:
         assert "2023" in seasons
         assert "2024" in seasons
 
-    def test_now_keyword_historic(self):
+    def test_now_keyword_historic(self, discovered_leagues):
         """Test generating URLs with 'now' keyword for historic matches."""
         current_year = datetime.now().year
         urls_with_seasons = URLBuilder.get_historic_matches_urls_for_range(
-            sport="football", from_date="now", to_date="now", league="england-premier-league"
+            sport="football", from_date="now", to_date="now", league="england-premier-league", discovered_leagues=discovered_leagues
         )
         assert len(urls_with_seasons) == 1
         url, season_str = urls_with_seasons[0]
         assert url == f"{ODDSPORTAL_BASE_URL}/football/england/premier-league-{current_year}/results/"
         assert season_str == str(current_year)
 
-    def test_invalid_season_format(self):
+    def test_invalid_season_format(self, discovered_leagues):
         """Test error handling for invalid season format."""
         with pytest.raises(ValueError, match="Invalid season format: 'invalid'"):
             URLBuilder.get_historic_matches_urls_for_range(
-                sport="football", from_date="invalid", to_date="2023", league="england-premier-league"
+                sport="football", from_date="invalid", to_date="2023", league="england-premier-league", discovered_leagues=discovered_leagues
             )
 
-    def test_end_season_before_start_season(self):
+    def test_end_season_before_start_season(self, discovered_leagues):
         """Test error handling when end season is before start season."""
         with pytest.raises(ValueError, match="End season/year cannot be before start season/year"):
             URLBuilder.get_historic_matches_urls_for_range(
-                sport="football", from_date="2025", to_date="2020", league="england-premier-league"
+                sport="football", from_date="2025", to_date="2020", league="england-premier-league", discovered_leagues=discovered_leagues
             )
 
-    def test_invalid_season_range_format(self):
+    def test_invalid_season_range_format(self, discovered_leagues):
         """Test error handling for invalid season range (more than 1 year apart)."""
         with pytest.raises(ValueError, match="Invalid season range"):
             URLBuilder.get_historic_matches_urls_for_range(
-                sport="football", from_date="2022-2024", to_date="2024-2025", league="england-premier-league"
+                sport="football", from_date="2022-2024", to_date="2024-2025", league="england-premier-league", discovered_leagues=discovered_leagues
             )
 
 
@@ -376,12 +357,12 @@ class TestParseSeasonForUrl:
 class TestGetAllAvailableSeasonsUrlRange:
     """Test the get_all_available_seasons_url_range method."""
 
-    def test_get_all_available_seasons_default_range(self):
+    def test_get_all_available_seasons_default_range(self, discovered_leagues):
         """Test generating URLs for all available seasons with default range."""
         current_year = datetime.now().year
 
         urls_with_seasons = URLBuilder.get_all_available_seasons_url_range(
-            sport="football", league="england-premier-league"
+            sport="football", league="england-premier-league", discovered_leagues=discovered_leagues
         )
 
         # Should generate from 1998 to current year + 2
@@ -397,11 +378,11 @@ class TestGetAllAvailableSeasonsUrlRange:
         assert last_season == str(current_year + 2)
         assert last_url == f"{ODDSPORTAL_BASE_URL}/football/england/premier-league-{current_year + 2}/results/"
 
-    def test_get_all_available_seasons_custom_range(self):
+    def test_get_all_available_seasons_custom_range(self, discovered_leagues):
         """Test generating URLs with custom fallback range."""
         urls_with_seasons = URLBuilder.get_all_available_seasons_url_range(
             sport="football", league="england-premier-league",
-            fallback_start_year=2020, fallback_end_year=2022
+            fallback_start_year=2020, fallback_end_year=2022, discovered_leagues=discovered_leagues
         )
 
         assert len(urls_with_seasons) == 3
@@ -414,15 +395,15 @@ class TestGetAllAvailableSeasonsUrlRange:
         for url, season_str in urls_with_seasons:
             assert url == f"{ODDSPORTAL_BASE_URL}/football/england/premier-league-{season_str}/results/"
 
-    def test_get_all_available_seasons_different_sports(self):
+    def test_get_all_available_seasons_different_sports(self, discovered_leagues):
         """Test generating URLs for different sports."""
         football_urls = URLBuilder.get_all_available_seasons_url_range(
             sport="football", league="england-premier-league",
-            fallback_start_year=2021, fallback_end_year=2021
+            fallback_start_year=2021, fallback_end_year=2021, discovered_leagues=discovered_leagues
         )
         tennis_urls = URLBuilder.get_all_available_seasons_url_range(
             sport="tennis", league="atp-tour",
-            fallback_start_year=2021, fallback_end_year=2021
+            fallback_start_year=2021, fallback_end_year=2021, discovered_leagues=discovered_leagues
         )
 
         assert len(football_urls) == 1
@@ -440,7 +421,7 @@ class TestDiscoverAvailableSeasons:
     """Test the discover_available_seasons method."""
 
     @pytest.mark.asyncio
-    async def test_discover_seasons_success(self):
+    async def test_discover_seasons_success(self, discovered_leagues):
         """Test successful season discovery with mock page."""
         # This would require mocking Playwright page object
         # For now, we'll test the method structure with a basic mock
@@ -454,7 +435,7 @@ class TestDiscoverAvailableSeasons:
 
         # Test with content-based discovery
         earliest, latest = await URLBuilder.discover_available_seasons(
-            "football", "england-premier-league", mock_page
+            "football", "england-premier-league", mock_page, discovered_leagues
         )
 
         # Should find seasons 2020, 2021, and 2022 in content
@@ -463,7 +444,7 @@ class TestDiscoverAvailableSeasons:
         assert latest == 2024    # 2022 + 2 (buffer)
 
     @pytest.mark.asyncio
-    async def test_discover_seasons_no_content(self):
+    async def test_discover_seasons_no_content(self, discovered_leagues):
         """Test season discovery when no seasons found."""
         from unittest.mock import AsyncMock
 
@@ -474,7 +455,7 @@ class TestDiscoverAvailableSeasons:
         mock_page.content = AsyncMock(return_value='<html>No seasons here</html>')
 
         earliest, latest = await URLBuilder.discover_available_seasons(
-            "football", "england-premier-league", mock_page
+            "football", "england-premier-league", mock_page, discovered_leagues
         )
 
         # Should return None when no seasons found
@@ -482,7 +463,7 @@ class TestDiscoverAvailableSeasons:
         assert latest is None
 
     @pytest.mark.asyncio
-    async def test_discover_seasons_exception_handling(self):
+    async def test_discover_seasons_exception_handling(self, discovered_leagues):
         """Test season discovery exception handling."""
         from unittest.mock import AsyncMock
 
@@ -490,7 +471,7 @@ class TestDiscoverAvailableSeasons:
         mock_page.goto = AsyncMock(side_effect=Exception("Navigation failed"))
 
         earliest, latest = await URLBuilder.discover_available_seasons(
-            "football", "england-premier-league", mock_page
+            "football", "england-premier-league", mock_page, discovered_leagues
         )
 
         # Should return None when exception occurs
@@ -501,10 +482,10 @@ class TestDiscoverAvailableSeasons:
 class TestHistoricMatchesUrlsForRangeEdgeCases:
     """Test edge cases for get_historic_matches_urls_for_range method."""
 
-    def test_unlimited_past_with_to_date(self):
+    def test_unlimited_past_with_to_date(self, discovered_leagues):
         """Test unlimited past (None from_date) with specific to_date."""
         urls_with_seasons = URLBuilder.get_historic_matches_urls_for_range(
-            sport="football", from_date=None, to_date="2022", league="england-premier-league"
+            sport="football", from_date=None, to_date="2022", league="england-premier-league", discovered_leagues=discovered_leagues
         )
 
         # Should generate from 1998 (default start) to 2022
@@ -516,10 +497,10 @@ class TestHistoricMatchesUrlsForRangeEdgeCases:
         assert first_season == "1998"
         assert last_season == "2022"
 
-    def test_unlimited_future_with_from_date(self):
+    def test_unlimited_future_with_from_date(self, discovered_leagues):
         """Test when only from_date is specified (should mirror to from_date)."""
         urls_with_seasons = URLBuilder.get_historic_matches_urls_for_range(
-            sport="football", from_date="2020", to_date=None, league="england-premier-league"
+            sport="football", from_date="2020", to_date=None, league="england-premier-league", discovered_leagues=discovered_leagues
         )
 
         # When only from_date is specified, to_date should be set to from_date (single year)

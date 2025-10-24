@@ -49,6 +49,7 @@ class OddsPortalScraper(BaseScraper):
         scrape_odds_history: bool = True,  # Always scrape odds history by default
         target_bookmaker: str | None = None,
         max_pages: int | None = None,
+        discovered_leagues: dict[str, str] | None = None,
     ) -> list[dict[str, Any]]:
         """
         Scrapes historical odds data.
@@ -69,7 +70,7 @@ class OddsPortalScraper(BaseScraper):
         if not current_page:
             raise RuntimeError("Playwright has not been initialized. Call `start_playwright()` first.")
 
-        base_url = URLBuilder.get_historic_matches_url(sport=sport, league=league, season=season)
+        base_url = URLBuilder.get_historic_matches_url(sport=sport, league=league, season=season, discovered_leagues=discovered_leagues)
         self.logger.info(f"Starting historic scraping for {sport} - {league} - {season}")
         self.logger.info(f"Base URL: {base_url}")
         self.logger.info(f"Max pages parameter: {max_pages}")
@@ -108,6 +109,7 @@ class OddsPortalScraper(BaseScraper):
         markets: list[str] | None = None,
         scrape_odds_history: bool = True,  # Always scrape odds history by default
         target_bookmaker: str | None = None,
+        discovered_leagues: dict[str, str] | None = None,
     ) -> list[dict[str, Any]]:
         """
         Scrapes upcoming match odds.
@@ -127,7 +129,7 @@ class OddsPortalScraper(BaseScraper):
         if not current_page:
             raise RuntimeError("Playwright has not been initialized. Call `start_playwright()` first.")
 
-        url = URLBuilder.get_upcoming_matches_url(sport=sport, date=date, league=league)
+        url = URLBuilder.get_upcoming_matches_url(sport=sport, date=date, league=league, discovered_leagues=discovered_leagues)
         self.logger.info(f"Fetching upcoming odds from {url}")
 
         await current_page.goto(url, timeout=10000, wait_until="domcontentloaded")

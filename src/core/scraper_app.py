@@ -1,6 +1,7 @@
 import asyncio
 import logging
 from datetime import datetime
+from typing import Dict
 
 from src.core.browser_helper import BrowserHelper
 from src.core.odds_portal_market_extractor import OddsPortalMarketExtractor
@@ -12,7 +13,6 @@ from src.utils.command_enum import CommandEnum
 from src.utils.date_utils import parse_flexible_date, format_date_for_oddsportal
 from src.utils.proxy_manager import ProxyManager
 from src.utils.sport_market_constants import Sport
-from src.utils.sport_league_constants import SPORTS_LEAGUES_URLS_MAPPING
 
 logger = logging.getLogger("ScraperApp")
 MAX_RETRIES = 3
@@ -523,7 +523,18 @@ async def _scrape_single_league_date_range(scraper, command: CommandEnum, sport:
         List of combined results from all dates/seasons
     """
     if command == CommandEnum.UPCOMING_MATCHES:
-        return await _scrape_upcoming_date_range(scraper, sport, from_date, to_date, league, **kwargs)
+        # For upcoming matches with specific league, discover leagues if needed
+        discovered_leagues = None
+        if league:
+            try:
+                logger.info(f"Discovering leagues for upcoming matches in sport '{sport}'")
+                discovered_leagues = await URLBuilder.discover_leagues_for_sport(sport, scraper.playwright_manager.page)
+                if not discovered_leagues:
+                    logger.warning(f"No leagues discovered for sport '{sport}', upcoming matches may be limited")
+            except Exception as e:
+                logger.error(f"Failed to discover leagues for upcoming matches: {e}")
+
+        return await _scrape_upcoming_date_range(scraper, sport, from_date, to_date, league, discovered_leagues, **kwargs)
     else:  # HISTORIC
         if league:
             return await _scrape_historic_date_range(scraper, sport, league, from_date, to_date, **kwargs)
@@ -549,7 +560,18 @@ async def _scrape_single_sport_date_range(scraper, command: CommandEnum, sport: 
         List of combined results from all dates/seasons
     """
     if command == CommandEnum.UPCOMING_MATCHES:
-        return await _scrape_upcoming_date_range(scraper, sport, from_date, to_date, league, **kwargs)
+        # For upcoming matches with specific league, discover leagues if needed
+        discovered_leagues = None
+        if league:
+            try:
+                logger.info(f"Discovering leagues for upcoming matches in sport '{sport}'")
+                discovered_leagues = await URLBuilder.discover_leagues_for_sport(sport, scraper.playwright_manager.page)
+                if not discovered_leagues:
+                    logger.warning(f"No leagues discovered for sport '{sport}', upcoming matches may be limited")
+            except Exception as e:
+                logger.error(f"Failed to discover leagues for upcoming matches: {e}")
+
+        return await _scrape_upcoming_date_range(scraper, sport, from_date, to_date, league, discovered_leagues, **kwargs)
     else:  # HISTORIC
         if league:
             return await _scrape_historic_date_range(scraper, sport, league, from_date, to_date, **kwargs)
@@ -558,7 +580,7 @@ async def _scrape_single_sport_date_range(scraper, command: CommandEnum, sport: 
             return await _scrape_historic_all_leagues(scraper, sport, from_date, to_date, **kwargs)
 
 
-async def _scrape_upcoming_date_range(scraper, sport: str, from_date: str, to_date: str, league: str | None = None, **kwargs) -> list[dict]:
+async def _scrape_upcoming_date_range(scraper, sport: str, from_date: str, to_date: str, league: str | None = None, discovered_leagues: Dict[str, str] | None = None, **kwargs) -> list[dict]:
     """
     Scrape upcoming matches across a date range.
 
@@ -593,6 +615,7 @@ async def _scrape_upcoming_date_range(scraper, sport: str, from_date: str, to_da
                 sport=sport,
                 date=date_str.replace("-", ""),  # Convert back to YYYYMMDD format
                 league=league,
+                discovered_leagues=discovered_leagues,
                 **kwargs
             )
 
@@ -623,7 +646,7 @@ async def _scrape_upcoming_date_range(scraper, sport: str, from_date: str, to_da
 
 async def _scrape_historic_all_leagues(scraper, sport: str, from_date: str, to_date: str, **kwargs) -> list[dict]:
     """
-    Scrape historic matches across all available leagues for a sport.
+    Scrape historic matches across all available leagues for a sport using dynamic discovery.
 
     Args:
         scraper: The scraper instance
@@ -641,12 +664,20 @@ async def _scrape_historic_all_leagues(scraper, sport: str, from_date: str, to_d
         logger.error(f"Unsupported sport '{sport}' for league discovery")
         return []
 
-    if sport_enum not in SPORTS_LEAGUES_URLS_MAPPING:
-        logger.error(f"No leagues found for sport '{sport}'")
-        return []
+    # Use dynamic league discovery instead of hardcoded constants
+    logger.info(f"Dynamically discovering leagues for sport '{sport}'")
+    try:
+        leagues = await URLBuilder.discover_leagues_for_sport(sport, scraper.playwright_manager.page)
 
-    leagues = SPORTS_LEAGUES_URLS_MAPPING[sport_enum]
-    logger.info(f"Found {len(leagues)} leagues for sport '{sport}': {', '.join(leagues.keys())}")
+        if not leagues:
+            logger.error(f"No leagues discovered for sport '{sport}'")
+            return []
+
+        logger.info(f"Discovered {len(leagues)} leagues for sport '{sport}': {', '.join(list(leagues.keys())[:10])}{'...' if len(leagues) > 10 else ''}")
+
+    except Exception as e:
+        logger.error(f"Failed to discover leagues for sport '{sport}': {str(e)}")
+        return []
 
     all_results = []
     failed_leagues = []
@@ -654,7 +685,7 @@ async def _scrape_historic_all_leagues(scraper, sport: str, from_date: str, to_d
     for league_name, league_url in leagues.items():
         try:
             logger.info(f"Scraping league '{league_name}' for sport '{sport}' from {from_date} to {to_date}")
-            league_results = await _scrape_historic_date_range(scraper, sport, league_name, from_date, to_date, **kwargs)
+            league_results = await _scrape_historic_date_range(scraper, sport, league_name, from_date, to_date, leagues, **kwargs)
             all_results.extend(league_results)
             logger.info(f"Successfully scraped {len(league_results)} matches from league '{league_name}'")
         except Exception as e:
@@ -665,15 +696,19 @@ async def _scrape_historic_all_leagues(scraper, sport: str, from_date: str, to_d
     if failed_leagues:
         logger.warning(f"Failed to scrape {len(failed_leagues)} leagues for sport '{sport}': {', '.join(failed_leagues)}")
 
+    successful_leagues = len(leagues) - len(failed_leagues)
     logger.info(
         f"Completed historic scraping for sport '{sport}': "
-        f"{len(all_results)} total matches scraped from {len(leagues) - len(failed_leagues)}/{len(leagues)} leagues"
+        f"{len(all_results)} total matches scraped from {successful_leagues}/{len(leagues)} leagues"
     )
+
+    # Log successful discovery completion
+    logger.info(f"Dynamic league discovery completed for sport '{sport}': found {len(leagues)} total leagues")
 
     return all_results
 
 
-async def _scrape_historic_date_range(scraper, sport: str, league: str, from_date: str, to_date: str, **kwargs) -> list[dict]:
+async def _scrape_historic_date_range(scraper, sport: str, league: str, from_date: str, to_date: str, discovered_leagues: Dict[str, str] | None = None, **kwargs) -> list[dict]:
     """
     Scrape historic matches across a season/year range.
 
@@ -696,7 +731,7 @@ async def _scrape_historic_date_range(scraper, sport: str, league: str, from_dat
         try:
             # Try to auto-discover season ranges
             earliest_year, latest_year = await URLBuilder.discover_available_seasons(
-                sport, league, scraper.page
+                sport, league, scraper.page, discovered_leagues
             )
 
             if earliest_year and latest_year:
@@ -705,16 +740,16 @@ async def _scrape_historic_date_range(scraper, sport: str, league: str, from_dat
                 urls_with_seasons = []
                 for year in range(earliest_year, latest_year + 1):
                     season_str = str(year)
-                    url = URLBuilder.get_historic_matches_url(sport, league, season_str)
+                    url = URLBuilder.get_historic_matches_url(sport, league, season_str, discovered_leagues)
                     urls_with_seasons.append((url, season_str))
             else:
                 logger.warning(f"Auto-discovery failed for {sport}/{league}, using default range")
                 # Fall back to default range
-                urls_with_seasons = URLBuilder.get_all_available_seasons_url_range(sport, league)
+                urls_with_seasons = URLBuilder.get_all_available_seasons_url_range(sport, league, discovered_leagues=discovered_leagues)
         except Exception as e:
             logger.warning(f"Season auto-discovery failed for {sport}/{league}: {e}, using default range")
             # Fall back to default range
-            urls_with_seasons = URLBuilder.get_all_available_seasons_url_range(sport, league)
+            urls_with_seasons = URLBuilder.get_all_available_seasons_url_range(sport, league, discovered_leagues=discovered_leagues)
     else:
         # Use specified date range
         try:
@@ -737,6 +772,7 @@ async def _scrape_historic_date_range(scraper, sport: str, league: str, from_dat
                 sport=sport,
                 league=league,
                 season=season_str,
+                discovered_leagues=discovered_leagues,
                 **kwargs
             )
 

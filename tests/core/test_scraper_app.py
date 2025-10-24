@@ -667,27 +667,44 @@ async def test_scrape_all_sports_date_range_success():
 async def test_scrape_multiple_leagues_date_range_success():
     """Test _scrape_multiple_leagues_date_range with successful scraping."""
     scraper_mock = MagicMock()
-    scrape_func_mock = AsyncMock()
+    # Mock the playwright manager and page properly for dynamic discovery
+    scraper_mock.playwright_manager = MagicMock()
+    scraper_mock.playwright_manager.page = AsyncMock()
 
-    # Mock successful scraping for each league
-    scrape_func_mock.side_effect = [
+    # Mock discovered leagues (simulating dynamic discovery)
+    discovered_leagues = {
+        "england-premier-league": "https://www.oddsportal.com/football/england/premier-league",
+        "spain-laliga": "https://www.oddsportal.com/football/spain/laliga"
+    }
+
+    # Mock the scraper methods directly since they get called with discovered_leagues
+    scraper_mock.scrape_upcoming = AsyncMock(side_effect=[
         [{"match1": "data1"}],  # premier-league
         [{"match2": "data2"}],  # spain-laliga
-    ]
+    ])
 
-    with patch("src.core.scraper_app.retry_scrape", scrape_func_mock):
-        result = await _scrape_multiple_leagues_date_range(
-            scraper=scraper_mock,
-            command=CommandEnum.UPCOMING_MATCHES,
-            leagues=["england-premier-league", "spain-laliga"],
-            sport="football",
-            from_date="20250101",
-            to_date="20250101",
-            markets=["1x2"],
-        )
+    # Mock _scrape_single_league_date_range which is what gets called
+    async def mock_scrape_single_league_date_range(scraper, command, sport, league, from_date, to_date, **kwargs):
+        if league == "england-premier-league":
+            return [{"match1": "data1"}]
+        elif league == "spain-laliga":
+            return [{"match2": "data2"}]
+        return []
+
+    # Patch both the dynamic discovery and the date range function
+    with patch('src.core.scraper_app.URLBuilder.discover_leagues_for_sport', return_value=discovered_leagues):
+        with patch('src.core.scraper_app._scrape_single_league_date_range', side_effect=mock_scrape_single_league_date_range):
+            result = await _scrape_multiple_leagues_date_range(
+                scraper=scraper_mock,
+                command=CommandEnum.UPCOMING_MATCHES,
+                leagues=["england-premier-league", "spain-laliga"],
+                sport="football",
+                from_date="20250101",
+                to_date="20250101",
+                markets=["1x2"],
+            )
 
     # Verify all leagues were processed
-    assert scrape_func_mock.call_count == 2
     assert len(result) == 2
     assert result[0] == {"match1": "data1"}
     assert result[1] == {"match2": "data2"}
@@ -697,24 +714,36 @@ async def test_scrape_multiple_leagues_date_range_success():
 async def test_scrape_multiple_leagues_date_range_with_failures():
     """Test _scrape_multiple_leagues_date_range with some failures."""
     scraper_mock = MagicMock()
-    scrape_func_mock = AsyncMock()
+    # Mock the playwright manager and page properly for dynamic discovery
+    scraper_mock.playwright_manager = MagicMock()
+    scraper_mock.playwright_manager.page = AsyncMock()
 
-    # Mock mixed success/failure
-    scrape_func_mock.side_effect = [
-        [{"match1": "data1"}],  # premier-league - success
-        Exception("Network error"),  # primera-division - failure
-    ]
+    # Mock discovered leagues (simulating dynamic discovery)
+    discovered_leagues = {
+        "england-premier-league": "https://www.oddsportal.com/football/england/premier-league",
+        "spain-primera-division": "https://www.oddsportal.com/football/spain/primera-division"
+    }
 
-    with patch("src.core.scraper_app.retry_scrape", scrape_func_mock):
-        result = await _scrape_multiple_leagues_date_range(
-            scraper=scraper_mock,
-            command=CommandEnum.UPCOMING_MATCHES,
-            leagues=["england-premier-league", "spain-primera-division"],
-            sport="football",
-            from_date="20250101",
-            to_date="20250101",
-            markets=["1x2"],
-        )
+    # Mock _scrape_single_league_date_range which is what gets called
+    async def mock_scrape_single_league_date_range(scraper, command, sport, league, from_date, to_date, **kwargs):
+        if league == "england-premier-league":
+            return [{"match1": "data1"}]
+        elif league == "spain-primera-division":
+            raise Exception("Network error")
+        return []
+
+    # Patch both the dynamic discovery and the date range function
+    with patch('src.core.scraper_app.URLBuilder.discover_leagues_for_sport', return_value=discovered_leagues):
+        with patch('src.core.scraper_app._scrape_single_league_date_range', side_effect=mock_scrape_single_league_date_range):
+            result = await _scrape_multiple_leagues_date_range(
+                scraper=scraper_mock,
+                command=CommandEnum.UPCOMING_MATCHES,
+                leagues=["england-premier-league", "spain-primera-division"],
+                sport="football",
+                from_date="20250101",
+                to_date="20250101",
+                markets=["1x2"],
+            )
 
     # Verify only successful results are included
     assert len(result) == 1
@@ -881,30 +910,40 @@ async def test_scrape_historic_all_leagues_success():
     from src.core.scraper_app import _scrape_historic_all_leagues
 
     scraper_mock = MagicMock()
-    scrape_func_mock = AsyncMock(return_value=[{"match": "data"}])
+    # Mock the playwright manager and page properly for dynamic discovery
+    scraper_mock.playwright_manager = MagicMock()
+    scraper_mock.playwright_manager.page = AsyncMock()
+
+    # Mock discovered leagues (simulating dynamic discovery)
+    discovered_leagues = {
+        "premier-league": "https://www.oddsportal.com/football/england/premier-league",
+        "championship": "https://www.oddsportal.com/football/england/championship",
+        "laliga": "https://www.oddsportal.com/football/spain/laliga"
+    }
 
     # Mock _scrape_historic_date_range to return different data for each league
     call_count = 0
-    async def mock_scrape_historic_date_range(scraper, sport, league, from_date, to_date, **kwargs):
+    async def mock_scrape_historic_date_range(scraper, sport, league, from_date, to_date, discovered_leagues, **kwargs):
         nonlocal call_count
         call_count += 1
         return [{"sport": sport, "league": league, "match": f"data_{call_count}"}]
 
-    # Patch the _scrape_historic_date_range function
-    with patch('src.core.scraper_app._scrape_historic_date_range', side_effect=mock_scrape_historic_date_range):
-        result = await _scrape_historic_all_leagues(
-            scraper=scraper_mock,
-            sport="football",
-            from_date="2023",
-            to_date="2023"
-        )
+    # Patch both the dynamic discovery and the scrape function
+    with patch('src.core.scraper_app.URLBuilder.discover_leagues_for_sport', return_value=discovered_leagues):
+        with patch('src.core.scraper_app._scrape_historic_date_range', side_effect=mock_scrape_historic_date_range):
+            result = await _scrape_historic_all_leagues(
+                scraper=scraper_mock,
+                sport="football",
+                from_date="2023",
+                to_date="2023"
+            )
 
-    # Should have data from all football leagues (34 leagues)
-    assert len(result) == 34
+    # Should have data from all discovered leagues (3 leagues in this mock)
+    assert len(result) == 3
     assert result[0]["sport"] == "football"
     assert "league" in result[0]
     assert result[0]["match"] == "data_1"
-    assert result[-1]["match"] == "data_34"
+    assert result[-1]["match"] == "data_3"
 
 
 @pytest.mark.asyncio
@@ -913,24 +952,36 @@ async def test_scrape_historic_all_leagues_with_failures():
     from src.core.scraper_app import _scrape_historic_all_leagues
 
     scraper_mock = MagicMock()
+    # Mock the playwright manager and page properly for dynamic discovery
+    scraper_mock.playwright_manager = MagicMock()
+    scraper_mock.playwright_manager.page = AsyncMock()
+
+    # Mock discovered leagues (simulating dynamic discovery)
+    discovered_leagues = {
+        "premier-league": "https://www.oddsportal.com/football/england/premier-league",
+        "france-ligue-1": "https://www.oddsportal.com/football/france/ligue-1",  # This will fail
+        "championship": "https://www.oddsportal.com/football/england/championship",  # This will fail
+        "laliga": "https://www.oddsportal.com/football/spain/laliga"
+    }
 
     # Mock _scrape_historic_date_range to fail for some leagues
-    async def mock_scrape_historic_date_range_with_failures(scraper, sport, league, from_date, to_date, **kwargs):
-        if league in ["france-ligue-1", "england-championship"]:  # Make 2 leagues fail
+    async def mock_scrape_historic_date_range_with_failures(scraper, sport, league, from_date, to_date, discovered_leagues, **kwargs):
+        if league in ["france-ligue-1", "championship"]:  # Make 2 leagues fail
             raise ValueError(f"Network error for {league}")
         return [{"sport": sport, "league": league, "match": "data"}]
 
-    # Patch the _scrape_historic_date_range function
-    with patch('src.core.scraper_app._scrape_historic_date_range', side_effect=mock_scrape_historic_date_range_with_failures):
-        result = await _scrape_historic_all_leagues(
-            scraper=scraper_mock,
-            sport="football",
-            from_date="2023",
-            to_date="2023"
-        )
+    # Patch both the dynamic discovery and the scrape function
+    with patch('src.core.scraper_app.URLBuilder.discover_leagues_for_sport', return_value=discovered_leagues):
+        with patch('src.core.scraper_app._scrape_historic_date_range', side_effect=mock_scrape_historic_date_range_with_failures):
+            result = await _scrape_historic_all_leagues(
+                scraper=scraper_mock,
+                sport="football",
+                from_date="2023",
+                to_date="2023"
+            )
 
-    # Should have data from successful leagues only (34 - 2 = 32 leagues)
-    assert len(result) == 32
+    # Should have data from successful leagues only (4 - 2 = 2 leagues)
+    assert len(result) == 2
     # Verify that the failed leagues are not in the results
     leagues_in_result = [item["league"] for item in result]
     assert "france-ligue-1" not in leagues_in_result
@@ -992,8 +1043,13 @@ async def test_scrape_historic_date_range_all_functionality():
     scraper_mock = MagicMock()
     scraper_mock.page = AsyncMock()
 
+    # Mock discovered leagues
+    discovered_leagues = {
+        "england-premier-league": "https://www.oddsportal.com/football/england/premier-league"
+    }
+
     # Mock successful season discovery
-    async def mock_discover_seasons(sport, league, page):
+    async def mock_discover_seasons(sport, league, page, discovered_leagues=None):
         return 2020, 2022  # Discovered range 2020-2022
 
     # Mock the scraper's scrape_historic method
@@ -1009,7 +1065,8 @@ async def test_scrape_historic_date_range_all_functionality():
             sport="football",
             league="england-premier-league",
             from_date=None,  # --all mode
-            to_date=None     # --all mode
+            to_date=None,    # --all mode
+            discovered_leagues=discovered_leagues
         )
 
     # Should have discovered seasons 2020, 2021, 2022
@@ -1032,8 +1089,13 @@ async def test_scrape_historic_date_range_all_functionality_fallback():
     scraper_mock = MagicMock()
     scraper_mock.page = AsyncMock()
 
+    # Mock discovered leagues
+    discovered_leagues = {
+        "england-premier-league": "https://www.oddsportal.com/football/england/premier-league"
+    }
+
     # Mock failed season discovery (returns None, None)
-    async def mock_discover_seasons_fail(sport, league, page):
+    async def mock_discover_seasons_fail(sport, league, page, discovered_leagues=None):
         return None, None
 
     # Mock the scraper's scrape_historic method
@@ -1049,7 +1111,8 @@ async def test_scrape_historic_date_range_all_functionality_fallback():
             sport="football",
             league="england-premier-league",
             from_date=None,  # --all mode
-            to_date=None     # --all mode
+            to_date=None,    # --all mode
+            discovered_leagues=discovered_leagues
         )
 
     # Should fall back to default range and get some results

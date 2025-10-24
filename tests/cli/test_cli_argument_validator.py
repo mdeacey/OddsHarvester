@@ -83,10 +83,14 @@ def test_validate_markets_invalid(validator, mock_args):
         validator.validate_args(mock_args)
 
 
-def test_validate_league_invalid(validator, mock_args):
-    mock_args.leagues = ["invalid_league"]
-    with pytest.raises(ValueError, match="Invalid league: 'invalid_league' for sport 'football'."):
-        validator.validate_args(mock_args)
+def test_validate_league_valid_after_dynamic_discovery(validator, mock_args):
+    """Test that league validation passes since validation is now done during scraping."""
+    mock_args.leagues = ["any_league_name"]  # Any league name should pass CLI validation
+    try:
+        validator.validate_args(mock_args)  # Should not raise an error
+    except ValueError as e:
+        if "Invalid league" in str(e):
+            pytest.fail("League validation should now be done during scraping, not CLI validation")
 
 
 def test_validate_date_range_invalid_format(validator, mock_args):
@@ -201,16 +205,14 @@ def test_validate_league_rugby_union():
     errors = validator._validate_leagues(sport=Sport.RUGBY_UNION, leagues=valid_leagues)
     assert not errors, "Validation should succeed for multiple valid Rugby Union leagues"
 
-    # Test invalid league
-    errors = validator._validate_leagues(sport=Sport.RUGBY_UNION, leagues=["invalid-league"])
-    assert len(errors) == 1, "Validation should fail for invalid Rugby Union league"
-    assert "Invalid league: 'invalid-league' for sport 'rugby-union'" in errors[0]
+    # Test that any league passes CLI validation now (validation done during scraping)
+    errors = validator._validate_leagues(sport=Sport.RUGBY_UNION, leagues=["any-league-name"])
+    assert len(errors) == 0, "CLI league validation should pass for any league name - validation happens during scraping"
 
-    # Test mixed valid and invalid leagues
-    mixed_leagues = ["six-nations", "invalid-league", "france-top-14"]
+    # Test that any mixed leagues pass CLI validation now (validation done during scraping)
+    mixed_leagues = ["six-nations", "any-league-name", "france-top-14"]
     errors = validator._validate_leagues(sport=Sport.RUGBY_UNION, leagues=mixed_leagues)
-    assert len(errors) == 1, "Validation should fail for invalid league in mixed list"
-    assert "Invalid league: 'invalid-league' for sport 'rugby-union'" in errors[0]
+    assert len(errors) == 0, "CLI league validation should pass for any league names - validation happens during scraping"
 
 
 def test_validate_empty_leagues_list():

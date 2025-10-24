@@ -10,7 +10,6 @@ from src.utils.date_utils import (
     validate_season_range, normalize_season
 )
 from src.utils.odds_format_enum import OddsFormat
-from src.utils.sport_league_constants import SPORTS_LEAGUES_URLS_MAPPING
 from src.utils.sport_market_constants import Sport
 from src.utils.utils import get_supported_markets
 
@@ -158,26 +157,23 @@ class CLIArgumentValidator:
         return errors
 
     def _validate_leagues(self, sport: str, leagues: list[str] | None) -> list[str]:
-        """Validates the leagues argument based on the sport."""
+        """Validates the leagues argument based on the sport.
+
+        Note: League validation is now handled dynamically during scraping.
+        CLI only validates that the sport format is valid.
+        """
         errors = []
 
         if not leagues:
             return errors
 
         try:
-            sport_enum = Sport(sport.lower()) if isinstance(sport, str) else sport
+            Sport(sport.lower()) if isinstance(sport, str) else sport
         except ValueError:
             return [f"Invalid sport: '{sport}'. Supported sports are: {', '.join(s.value for s in Sport)}."]
 
-        if sport_enum not in SPORTS_LEAGUES_URLS_MAPPING:
-            errors.append(f"Sport '{sport}' is not supported for league validation.")
-            return errors
-
-        supported_leagues = SPORTS_LEAGUES_URLS_MAPPING[sport_enum]
-        for league in leagues:
-            if league not in supported_leagues:
-                errors.append(f"Invalid league: '{league}' for sport '{sport_enum.value}'.")
-
+        # League validation is now handled dynamically during scraping
+        # No need to validate against hardcoded constants anymore
         return errors
 
     def _validate_date_range(
