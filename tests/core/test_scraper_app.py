@@ -1194,3 +1194,128 @@ async def test_get_urls_for_specific_seasons_integration():
     # Verify only the requested seasons are included
     generated_seasons = [season for _, season in urls_with_seasons]
     assert sorted(generated_seasons) == sorted(["2010", "2014", "2018", "2022"])
+
+
+@pytest.mark.asyncio
+@patch("src.core.scraper_app.OddsPortalScraper")
+@patch("src.core.scraper_app.OddsPortalMarketExtractor")
+@patch("src.core.scraper_app.BrowserHelper")
+@patch("src.core.scraper_app.PlaywrightManager")
+@patch("src.core.scraper_app.ProxyManager")
+@patch("src.core.scraper_app.SportMarketRegistrar")
+async def test_scrape_historic_aussie_rules_leagues_all(
+    sport_market_registrar_mock,
+    proxy_manager_mock,
+    playwright_manager_mock,
+    browser_helper_mock,
+    market_extractor_mock,
+    odds_portal_scraper_mock,
+    setup_mocks,
+):
+    """Test --sports aussie-rules --leagues all --markets all --to now scenario (the failing case)."""
+
+    # Setup mocks
+    mocks = setup_mocks
+    scraper_mock = mocks["scraper_mock"]
+    scraper_mock.scrape_historic.return_value = [{"match": "data"}]
+
+    # Mock URLBuilder methods to avoid actual navigation
+    with patch("src.core.scraper_app.URLBuilder") as mock_url_builder:
+        # Mock dynamic league discovery
+        mock_url_builder.discover_all_leagues.return_value = {
+            "afl": "https://www.oddsportal.com/aussie-rules/afl/results/",
+            "vfl": "https://www.oddsportal.com/aussie-rules/vfl/results/"
+        }
+
+        # Mock URL generation for historic range with discovered_leagues parameter
+        mock_url_builder.get_historic_matches_urls_for_range.return_value = [
+            ("https://www.oddsportal.com/aussie-rules/afl-2023/results/", "2023"),
+            ("https://www.oddsportal.com/aussie-rules/vfl-2023/results/", "2023"),
+        ]
+
+        # Mock season discovery
+        mock_url_builder.get_all_available_seasons_url_range.return_value = ["2023"]
+
+        # Test the specific scenario that failed
+        from src.core.scraper_app import _scrape_single_league_date_range
+
+        result = await _scrape_single_league_date_range(
+            scraper=scraper_mock,
+            command=CommandEnum.HISTORIC,
+            sports="aussie-rules",
+            league="all",  # This triggers the path that was failing
+            from_date=None,
+            to_date="now",
+            markets=["all"],
+            scrape_odds_history=True,
+            target_bookmaker=None,
+            max_pages=None
+        )
+
+        # Verify the method was called with correct parameters including discovered_leagues
+        mock_url_builder.get_historic_matches_urls_for_range.assert_called_once()
+        call_args = mock_url_builder.get_historic_matches_urls_for_range.call_args
+
+        # Verify all required parameters were passed
+        assert call_args[0][0] == "aussie-rules"  # sport
+        assert call_args[0][1] is None  # from_date
+        assert call_args[0][2] == "now"  # to_date
+        assert call_args[0][3] == "all"  # league
+        assert call_args[0][4] == {  # discovered_leagues - this was the missing parameter!
+            "afl": "https://www.oddsportal.com/aussie-rules/afl/results/",
+            "vfl": "https://www.oddsportal.com/aussie-rules/vfl/results/"
+        }
+
+
+@pytest.mark.asyncio
+@patch("src.core.scraper_app.OddsPortalScraper")
+@patch("src.core.scraper_app.OddsPortalMarketExtractor")
+@patch("src.core.scraper_app.BrowserHelper")
+@patch("src.core.scraper_app.PlaywrightManager")
+@patch("src.core.scraper_app.ProxyManager")
+@patch("src.core.scraper_app.SportMarketRegistrar")
+async def test_scrape_historic_with_discovered_leagues_parameter(
+    sport_market_registrar_mock,
+    proxy_manager_mock,
+    playwright_manager_mock,
+    browser_helper_mock,
+    market_extractor_mock,
+    odds_portal_scraper_mock,
+    setup_mocks,
+):
+    """Test that discovered_leagues parameter is properly passed through the URL generation pipeline."""
+
+    # Setup mocks
+    mocks = setup_mocks
+    scraper_mock = mocks["scraper_mock"]
+    scraper_mock.scrape_historic.return_value = [{"match": "data"}]
+
+    # Mock URLBuilder methods
+    with patch("src.core.scraper_app.URLBuilder") as mock_url_builder:
+        mock_url_builder.discover_all_leagues.return_value = {
+            "test-league": "https://test.url"
+        }
+
+        mock_url_builder.get_historic_matches_urls_for_range.return_value = [
+            ("https://test.url/2023/results/", "2023")
+        ]
+
+        # Test the _scrape_historic_date_range function directly
+        from src.core.scraper_app import _scrape_historic_date_range
+
+        result = await _scrape_historic_date_range(
+            scraper=scraper_mock,
+            sport="football",
+            league="all",
+            from_date="2023",
+            to_date="2023",
+            discovered_leagues={"test-league": "https://test.url"},  # This should be passed through
+            markets=["1x2"],
+            scrape_odds_history=True,
+            target_bookmaker=None
+        )
+
+        # Verify discovered_leagues was passed correctly
+        mock_url_builder.get_historic_matches_urls_for_range.assert_called_once_with(
+            "football", "2023", "2023", "all", {"test-league": "https://test.url"}
+        )
