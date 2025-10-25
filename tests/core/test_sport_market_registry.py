@@ -10,6 +10,7 @@ class TestSportMarketRegistry:
     def setup_method(self):
         """Reset the registry before each test."""
         SportMarketRegistry._registry = {}
+        SportMarketRegistry._discovered_markets = {}
 
     def test_register_new_sport(self):
         """Test registering a new sport in the registry."""
@@ -71,6 +72,7 @@ class TestSportMarketRegistrar:
     def setup_method(self):
         """Reset the registry before each test."""
         SportMarketRegistry._registry = {}
+        SportMarketRegistry._discovered_markets = {}
 
     def test_create_market_lambda(self):
         """Test the creation of a lambda function for market extraction."""
@@ -342,3 +344,212 @@ class TestSportMarketRegistrar:
         assert "double_chance" in SportMarketRegistry.get_market_mapping(Sport.RUGBY_UNION.value)
         assert "btts" in SportMarketRegistry.get_market_mapping(Sport.ICE_HOCKEY.value)
         assert "home_away" in SportMarketRegistry.get_market_mapping(Sport.BASEBALL.value)
+
+
+class TestSportMarketRegistryAutoDiscovery:
+    """Tests for the auto-discovered markets functionality."""
+
+    def setup_method(self):
+        """Reset the registry before each test."""
+        SportMarketRegistry._registry = {}
+        SportMarketRegistry._discovered_markets = {}
+
+    def test_register_discovered_markets(self):
+        """Test registering auto-discovered markets."""
+        # Arrange
+        sport = "aussie-rules"
+        discovered_markets = {
+            "home_away": "Home/Away",
+            "over_under": "Over/Under",
+            "handicap": "Handicap"
+        }
+
+        # Act
+        SportMarketRegistry.register_discovered_markets(sport, discovered_markets)
+
+        # Assert
+        assert sport in SportMarketRegistry._discovered_markets
+        assert SportMarketRegistry._discovered_markets[sport] == discovered_markets
+
+    def test_get_market_mapping_with_discovered_markets_only(self):
+        """Test getting market mapping when only discovered markets exist."""
+        # Arrange
+        sport = "football"
+        discovered_markets = {
+            "1x2": "1X2",
+            "home_away": "Home/Away",
+            "over_under": "Over/Under"
+        }
+        SportMarketRegistry.register_discovered_markets(sport, discovered_markets)
+
+        # Act
+        result = SportMarketRegistry.get_market_mapping(sport)
+
+        # Assert
+        assert result == discovered_markets
+
+    def test_get_market_mapping_with_both_discovered_and_static(self):
+        """Test getting market mapping when both discovered and static markets exist."""
+        # Arrange
+        sport = "football"
+        discovered_markets = {
+            "custom_market": "Custom Market",
+            "1x2": "Discovered 1X2"  # This should be overridden by static
+        }
+        static_markets = {
+            "1x2": "Static 1X2",
+            "btts": "Both Teams to Score"
+        }
+
+        SportMarketRegistry.register_discovered_markets(sport, discovered_markets)
+        SportMarketRegistry._registry[sport] = static_markets
+
+        # Act
+        result = SportMarketRegistry.get_market_mapping(sport)
+
+        # Assert
+        # Should contain both discovered and static markets
+        assert "custom_market" in result
+        assert "1x2" in result
+        assert "btts" in result
+
+        # Static markets should take precedence
+        assert result["1x2"] == "Static 1X2"
+        assert result["custom_market"] == "Custom Market"
+        assert result["btts"] == "Both Teams to Score"
+
+    def test_get_market_mapping_fallback_to_static_only(self):
+        """Test fallback to static markets when no discovered markets exist."""
+        # Arrange
+        sport = "tennis"
+        static_markets = {
+            "match_winner": "Match Winner",
+            "over_under_games": "Over/Under Games"
+        }
+        SportMarketRegistry._registry[sport] = static_markets
+
+        # Act
+        result = SportMarketRegistry.get_market_mapping(sport)
+
+        # Assert
+        assert result == static_markets
+
+    def test_get_market_mapping_no_markets_at_all(self):
+        """Test getting market mapping when no markets exist for the sport."""
+        # Act
+        result = SportMarketRegistry.get_market_mapping("nonexistent_sport")
+
+        # Assert
+        assert result == {}
+
+    def test_has_discovered_markets(self):
+        """Test checking if discovered markets exist for a sport."""
+        # Arrange
+        SportMarketRegistry.register_discovered_markets("football", {"1x2": "1X2"})
+
+        # Act & Assert
+        assert SportMarketRegistry.has_discovered_markets("football") is True
+        assert SportMarketRegistry.has_discovered_markets("tennis") is False
+
+    def test_get_discovered_markets(self):
+        """Test getting only discovered markets for a sport."""
+        # Arrange
+        sport = "football"
+        discovered_markets = {"custom_market": "Custom Market"}
+        static_markets = {"1x2": "Static 1X2"}
+
+        SportMarketRegistry.register_discovered_markets(sport, discovered_markets)
+        SportMarketRegistry._registry[sport] = static_markets
+
+        # Act
+        result = SportMarketRegistry.get_discovered_markets(sport)
+
+        # Assert
+        assert result == discovered_markets
+        assert "custom_market" in result
+        assert "1x2" not in result  # Should not include static markets
+
+    def test_clear_discovered_markets_specific_sport(self):
+        """Test clearing discovered markets for a specific sport."""
+        # Arrange
+        SportMarketRegistry.register_discovered_markets("football", {"1x2": "1X2"})
+        SportMarketRegistry.register_discovered_markets("tennis", {"match_winner": "Match Winner"})
+
+        # Act
+        SportMarketRegistry.clear_discovered_markets("football")
+
+        # Assert
+        assert SportMarketRegistry.has_discovered_markets("football") is False
+        assert SportMarketRegistry.has_discovered_markets("tennis") is True
+
+    def test_clear_discovered_markets_all(self):
+        """Test clearing all discovered markets."""
+        # Arrange
+        SportMarketRegistry.register_discovered_markets("football", {"1x2": "1X2"})
+        SportMarketRegistry.register_discovered_markets("tennis", {"match_winner": "Match Winner"})
+
+        # Act
+        SportMarketRegistry.clear_discovered_markets()
+
+        # Assert
+        assert SportMarketRegistry.has_discovered_markets("football") is False
+        assert SportMarketRegistry.has_discovered_markets("tennis") is False
+        assert SportMarketRegistry._discovered_markets == {}
+
+    def test_register_discovered_markets_overwrite(self):
+        """Test that registering discovered markets overwrites existing ones."""
+        # Arrange
+        sport = "football"
+        original_markets = {"market1": "Market 1"}
+        updated_markets = {"market2": "Market 2", "market3": "Market 3"}
+
+        SportMarketRegistry.register_discovered_markets(sport, original_markets)
+
+        # Act
+        SportMarketRegistry.register_discovered_markets(sport, updated_markets)
+
+        # Assert
+        assert SportMarketRegistry._discovered_markets[sport] == updated_markets
+        assert "market1" not in SportMarketRegistry._discovered_markets[sport]
+        assert "market2" in SportMarketRegistry._discovered_markets[sport]
+        assert "market3" in SportMarketRegistry._discovered_markets[sport]
+
+    def test_integration_scenario_aussie_rules_discovery(self):
+        """Test integration scenario for Aussie Rules market discovery."""
+        # Simulate discovering aussie-rules markets
+        aussie_discovered = {
+            "home_away": "Home/Away",
+            "handicap": "Handicap",
+            "over_under": "Over/Under",
+            "margin": "Winning Margin",
+            "first_goalscorer": "First Goalscorer"
+        }
+        SportMarketRegistry.register_discovered_markets("aussie-rules", aussie_discovered)
+
+        # Also register some static markets for aussie-rules
+        static_aussie = {
+            "1x2": "1X2",
+            "home_away": "Static Home/Away"  # This should override discovered
+        }
+        SportMarketRegistry.register(Sport.AUSSIE_RULES, static_aussie)
+
+        # Test getting combined market mapping
+        result = SportMarketRegistry.get_market_mapping("aussie-rules")
+
+        # Should include all discovered markets plus static ones
+        assert len(result) >= 5
+        assert "home_away" in result
+        assert "handicap" in result
+        assert "over_under" in result
+        assert "margin" in result
+        assert "first_goalscorer" in result
+        assert "1x2" in result
+
+        # Static should take precedence for duplicates
+        assert result["home_away"] == "Static Home/Away"
+        assert result["1x2"] == "1X2"
+
+        # Test getting only discovered markets
+        discovered_only = SportMarketRegistry.get_discovered_markets("aussie-rules")
+        assert len(discovered_only) == 5
+        assert discovered_only["home_away"] == "Home/Away"  # Original discovered value

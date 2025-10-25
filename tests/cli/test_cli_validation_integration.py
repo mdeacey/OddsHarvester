@@ -39,7 +39,7 @@ class TestAllFlagConditionalValidation:
         mock_args = MagicMock(
             command="scrape_historic",
             sports="all",
-            markets=None,
+            markets=None,  # Note: With universal auto-discovery, this triggers market discovery
             leagues=None,
             from_date="2023",
             to_date="2024",
@@ -67,7 +67,7 @@ class TestAllFlagConditionalValidation:
         mock_args = MagicMock(
             command="scrape_upcoming",
             sports="all",
-            markets=None,
+            markets=None,  # Note: With universal auto-discovery, this triggers market discovery
             leagues=None,
             from_date="now",
             to_date="now",

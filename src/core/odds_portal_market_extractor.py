@@ -70,6 +70,7 @@ class OddsPortalMarketExtractor:
         """
         market_data = {}
         market_methods = SportMarketRegistry.get_market_mapping(sport)
+        discovered_markets = SportMarketRegistry.get_discovered_markets(sport)
 
         # Group markets by their main market type for optimization in preview mode
         market_groups = {}
@@ -77,6 +78,7 @@ class OddsPortalMarketExtractor:
         for market in markets:
             try:
                 if market in market_methods:
+                    # Handle traditional markets with registered methods
                     # For preview mode, group markets by their main market type
                     if preview_submarkets_only:
                         # Get the main market info from the existing market method
@@ -92,6 +94,12 @@ class OddsPortalMarketExtractor:
                         market_data[f"{market}_market"] = await market_methods[market](
                             self, page, period, scrape_odds_history, target_bookmaker, preview_submarkets_only
                         )
+                elif market in discovered_markets:
+                    # Handle auto-discovered markets
+                    self.logger.info(f"Scraping discovered market: {market} (Period: {period})")
+                    market_data[f"{market}_market"] = await self._scrape_discovered_market(
+                        page, market, discovered_markets[market], sport, period, scrape_odds_history, target_bookmaker
+                    )
                 else:
                     self.logger.warning(f"Market '{market}' is not supported for sport '{sport}'.")
 
@@ -135,6 +143,121 @@ class OddsPortalMarketExtractor:
                         market_data[f"{specific_market}_market"] = None
 
         return market_data
+
+    async def _scrape_discovered_market(
+        self,
+        page: Page,
+        market_name: str,
+        display_name: str,
+        sport: str,
+        period: str,
+        scrape_odds_history: bool,
+        target_bookmaker: str | None,
+    ) -> dict[str, Any]:
+        """
+        Scrape a discovered market that doesn't have a registered extraction method.
+
+        Args:
+            page: Playwright page instance
+            market_name: Normalized market name
+            display_name: Display name from the page
+            sport: Sport name
+            period: Match period
+            scrape_odds_history: Whether to scrape odds history
+            target_bookmaker: Specific bookmaker to target
+
+        Returns:
+            Dict containing market data
+        """
+        try:
+            # Try to determine market type and create appropriate extraction method
+            main_market = self._determine_main_market_type(market_name, display_name)
+            specific_market = display_name if display_name != main_market else None
+
+            # Map to common odds labels based on market type
+            odds_labels = self._get_odds_labels_for_market_type(main_market, market_name)
+
+            # Use the existing extract_market_odds method with inferred parameters
+            return await self.extract_market_odds(
+                page=page,
+                main_market=main_market,
+                specific_market=specific_market,
+                period=period,
+                odds_labels=odds_labels,
+                scrape_odds_history=scrape_odds_history,
+                target_bookmaker=target_bookmaker,
+                preview_submarkets_only=False,
+            )
+
+        except Exception as e:
+            self.logger.error(f"Error scraping discovered market '{market_name}': {e}")
+            return {"error": str(e), "market_name": market_name, "display_name": display_name}
+
+    def _determine_main_market_type(self, market_name: str, display_name: str) -> str:
+        """
+        Determine the main market type based on normalized market name and display name.
+
+        Args:
+            market_name: Normalized market name
+            display_name: Display name from page
+
+        Returns:
+            Main market type for extraction
+        """
+        display_lower = display_name.lower()
+
+        # Map market patterns to main market types
+        if any(pattern in display_lower for pattern in ['1x2', '1 x 2', 'win/draw/win']):
+            return "1X2"
+        elif any(pattern in display_lower for pattern in ['home/away', 'home away', 'match winner']):
+            return "Home/Away"
+        elif any(pattern in display_lower for pattern in ['over/under', 'over under', 'total']):
+            return "Over/Under"
+        elif any(pattern in display_lower for pattern in ['handicap', 'spread', 'point']):
+            return "Handicap"
+        elif any(pattern in display_lower for pattern in ['draw no bet', 'dnb']):
+            return "Draw No Bet"
+        elif any(pattern in display_lower for pattern in ['double chance']):
+            return "Double Chance"
+        elif any(pattern in display_lower for pattern in ['correct score']):
+            return "Correct Score"
+        elif any(pattern in display_lower for pattern in ['both teams to score', 'btts']):
+            return "Both Teams to Score"
+        elif any(pattern in display_lower for pattern in ['odd or even', 'odd/even']):
+            return "Odd or Even"
+        else:
+            # Default to 1X2 for unknown markets
+            self.logger.warning(f"Unknown market type for '{display_name}', defaulting to 1X2")
+            return "1X2"
+
+    def _get_odds_labels_for_market_type(self, main_market: str, market_name: str) -> list[str]:
+        """
+        Get appropriate odds labels for a market type.
+
+        Args:
+            main_market: Main market type
+            market_name: Normalized market name
+
+        Returns:
+            List of odds labels
+        """
+        if main_market == "1X2":
+            return ["1", "X", "2"]
+        elif main_market == "Home/Away":
+            return ["1", "2"]
+        elif main_market in ["Over/Under", "Handicap"]:
+            return ["odds_over", "odds_under"]
+        elif main_market == "Draw No Bet":
+            return ["dnb_team1", "dnb_team2"]
+        elif main_market == "Double Chance":
+            return ["1X", "12", "X2"]
+        elif main_market == "Both Teams to Score":
+            return ["btts_yes", "btts_no"]
+        elif main_market == "Odd or Even":
+            return ["odd", "even"]
+        else:
+            # Default to simple binary outcome
+            return ["outcome1", "outcome2"]
 
     async def extract_market_odds(
         self,

@@ -38,7 +38,8 @@ class URLBuilder:
         Raises:
             ValueError: If the season is provided but does not follow the expected format(s).
         """
-        base_url = URLBuilder.get_league_url(sport, league, discovered_leagues).rstrip("/")
+        # Remove /results/ from the base URL since we'll add it appropriately based on season
+        base_url = URLBuilder.get_league_url(sport, league, discovered_leagues).rstrip("/").replace("/results", "")
 
         # Treat missing season as current
         if not season:
@@ -48,6 +49,11 @@ class URLBuilder:
             raise ValueError(f"Invalid season format: {season}. Expected format: 'YYYY' or 'YYYY-YYYY'")
 
         if re.match(r"^\d{4}$", season):
+            # Check if this is the current year
+            # Current year uses no year in URL, previous years use year in URL
+            current_year = datetime.now().year
+            if int(season) == current_year:
+                return f"{base_url}/results/"  # Current year: no year in URL
             return f"{base_url}-{season}/results/"
 
         if re.match(r"^\d{4}-\d{4}$", season):
@@ -85,14 +91,14 @@ class URLBuilder:
         return f"{ODDSPORTAL_BASE_URL}/matches/{sport}/{date}/"
 
     @staticmethod
-    def get_league_url(sport: str, league: str, discovered_leagues: Dict[str, str]) -> str:
+    def get_league_url(sport: str, league: str, discovered_leagues: Dict[str, str] | None) -> str:
         """
         Retrieves the URL associated with a specific league for a given sport.
 
         Args:
             sport (str): The sport name (e.g., "football", "tennis").
             league (str): The league name (e.g., "premier-league", "atp-tour").
-            discovered_leagues (Dict[str, str]): Dynamically discovered leagues mapping.
+            discovered_leagues (Dict[str, str] | None): Dynamically discovered leagues mapping.
 
         Returns:
             str: The URL associated with the league.
@@ -100,6 +106,11 @@ class URLBuilder:
         Raises:
             ValueError: If the league is not found in the discovered leagues.
         """
+        # Handle None for backward compatibility
+        if discovered_leagues is None:
+            # Fallback to static URL construction
+            return f"{ODDSPORTAL_BASE_URL}/{sport}/{league}"
+
         if league not in discovered_leagues:
             raise ValueError(f"Invalid league '{league}' for sport '{sport}'. Available: {', '.join(discovered_leagues.keys())}")
 
@@ -273,7 +284,10 @@ class URLBuilder:
         try:
             # Navigate to the league's main results page (current season)
             league_url = URLBuilder.get_league_url(sports, league, discovered_leagues)
-            results_url = f"{league_url}/results/"
+
+            # The league_url from discovered leagues already ends with /results/
+            # So we use it directly instead of adding /results/ again
+            results_url = league_url
 
             logger.debug(f"Discovering seasons for {sports}/{league} at {results_url}")
 
@@ -302,7 +316,12 @@ class URLBuilder:
                         try:
                             text = await element.inner_text()
                             # Extract season years from text
-                            season_years = re.findall(r'\b(19|20)\d{2}\b', text)
+                            season_years = re.findall(r'\b(19\d{2}|20\d{2})\b', text)
+
+                            # Debug logging for aussie-rules
+                            if sports == "aussie-rules" and season_years:
+                                logger.debug(f"Season text: '{text}' -> extracted years: {season_years}")
+
                             for year in season_years:
                                 seasons_found.add(int(year))
                         except:
@@ -312,6 +331,11 @@ class URLBuilder:
                                 if href and '/results/' in href:
                                     # Extract year from URLs like "/results/2024/" or "/results/2023-2024/"
                                     year_match = re.search(r'/results/(\d{4})(?:-\d{4})?/', href)
+
+                                    # Debug logging for aussie-rules
+                                    if sports == "aussie-rules" and year_match:
+                                        logger.debug(f"Season href: '{href}' -> extracted year: {year_match.group(1)}")
+
                                     if year_match:
                                         seasons_found.add(int(year_match.group(1)))
                             except:
@@ -395,6 +419,21 @@ class URLBuilder:
             page_content = await page.content()
             soup = BeautifulSoup(page_content, 'html.parser')
 
+            # Enhanced debug logging for aussie-rules
+            if sport == "aussie-rules":
+                logger.debug(f"Page content length: {len(page_content)} characters")
+                logger.debug(f"Page content preview: {page_content[:1000]}...")
+
+                # Log all links found on the page for debugging
+                all_links = soup.find_all('a', href=True)
+                logger.debug(f"Total links found: {len(all_links)}")
+                sport_links = [link for link in all_links if f'/{sport}/' in link.get('href', '')]
+                logger.debug(f"Links containing '/{sport}/': {len(sport_links)}")
+                for i, link in enumerate(sport_links[:20]):  # Log first 20 links
+                    href = link.get('href', '')
+                    text = link.get_text(strip=True)
+                    logger.debug(f"  {i+1}. href='{href}' text='{text}'")
+
             discovered_leagues = {}
 
             # Multiple selector strategies to find league links
@@ -403,6 +442,14 @@ class URLBuilder:
                 f"a[href*='/{sport}/'][href*='/results/']",
                 # Secondary: Direct links to league main pages (not result pages)
                 f"a[href*='/{sport}/']:not([href*='/results/']):not([href*='/matches/'])",
+                # Tertiary: More specific league links within the main content area
+                "main ul li a[href*='/{sport}/'][href*='/results/']",
+                # Additional specific selectors for aussie-rules based on known structure
+                "div[id*='content'] a[href*='/{sport}/'][href*='/results/']",
+                "div[class*='main'] a[href*='/{sport}/'][href*='/results/']",
+                "table a[href*='/{sport}/'][href*='/results/']",
+                # Fallback: any link with sport and results
+                f"a[href*='/{sport}/'][href*='results']",
             ]
 
             leagues_found = set()
@@ -410,6 +457,7 @@ class URLBuilder:
             for selector in league_selectors:
                 try:
                     elements = soup.select(selector)
+                    logger.debug(f"Selector '{selector}' found {len(elements)} elements")
 
                     for element in elements:
                         try:
@@ -417,9 +465,13 @@ class URLBuilder:
                             if not href:
                                 continue
 
+                            # Enhanced debug logging for aussie-rules
+                            if sport == "aussie-rules":
+                                logger.debug(f"Processing link: href='{href}' text='{element.get_text(strip=True)}'")
+
                             # Skip invalid or unwanted links
                             navigation_patterns = [
-                                'odds', 'play', 'blocked', 'calculator', 'rules', 'home',
+                                'odds', 'play', 'blocked', 'calculator', '/rules/', 'home',
                                 'standings', 'footballbasketballtennisbaseballhockeyamerican', 'footballaussie',
                                 'upcoming', 'live', 'today', 'yesterday', 'archived'
                             ]
@@ -429,26 +481,72 @@ class URLBuilder:
                                 # Main page links should have at least 3 path segments (sport, region/country, league)
                                 href_parts = [part for part in href.split('/') if part]
                                 if len(href_parts) < 3:
+                                    if sport == "aussie-rules":
+                                        logger.debug(f"  Skipped: Not enough path parts ({len(href_parts)} < 3)")
                                     continue
 
-                            if (href.startswith('#') or
-                                'javascript:' in href or
-                                '/matches/' in href or
-                                href == f'/{sport}/results/' or  # Only exclude the main results page, not league result pages
-                                href == f'/{sport}/' or
-                                href.endswith('/standings/') or
-                                'oddsportal.com/football/' not in f"{ODDSPORTAL_BASE_URL}{href}" or
-                                any(pattern in href for pattern in navigation_patterns)):
+                            # Check each filter condition with debug logging
+                            if href.startswith('#'):
+                                if sport == "aussie-rules":
+                                    logger.debug(f"  Skipped: href starts with '#'")
+                                continue
+                            if 'javascript:' in href:
+                                if sport == "aussie-rules":
+                                    logger.debug(f"  Skipped: contains javascript:")
+                                continue
+                            if '/matches/' in href:
+                                if sport == "aussie-rules":
+                                    logger.debug(f"  Skipped: contains /matches/")
+                                continue
+                            if href == f'/{sport}/results/':
+                                if sport == "aussie-rules":
+                                    logger.debug(f"  Skipped: is main results page")
+                                continue
+                            if href == f'/{sport}/':
+                                if sport == "aussie-rules":
+                                    logger.debug(f"  Skipped: is main sport page")
+                                continue
+                            if href.endswith('/standings/'):
+                                if sport == "aussie-rules":
+                                    logger.debug(f"  Skipped: ends with /standings/")
+                                continue
+                            if f'oddsportal.com/{sport}/' not in f"{ODDSPORTAL_BASE_URL}{href}":
+                                if sport == "aussie-rules":
+                                    logger.debug(f"  Skipped: doesn't contain oddsportal.com/{sport}/")
+                                continue
+                            if any(pattern in href for pattern in navigation_patterns):
+                                if sport == "aussie-rules":
+                                    matched_patterns = [pattern for pattern in navigation_patterns if pattern in href]
+                                    logger.debug(f"  Skipped: contains navigation patterns: {matched_patterns}")
                                 continue
 
                             # Extract league information
                             league_name, league_url = URLBuilder._extract_league_info(href, sport)
 
+                            if sport == "aussie-rules":
+                                logger.debug(f"  Extracted: league_name='{league_name}' league_url='{league_url}'")
+
                             if league_name and league_url and league_name not in leagues_found:
                                 # Validate that this looks like a proper league URL
-                                if URLBuilder._is_valid_league_url(league_url, sport):
+                                is_valid = URLBuilder._is_valid_league_url(league_url, sport)
+                                if sport == "aussie-rules":
+                                    logger.debug(f"  Validation result: {is_valid}")
+
+                                if is_valid:
                                     discovered_leagues[league_name] = league_url
                                     leagues_found.add(league_name)
+                                    if sport == "aussie-rules":
+                                        logger.debug(f"  ✅ Added league: {league_name}")
+                                else:
+                                    if sport == "aussie-rules":
+                                        logger.debug(f"  ❌ Rejected league: {league_name} (validation failed)")
+                            elif sport == "aussie-rules":
+                                if not league_name:
+                                    logger.debug(f"  ❌ Rejected: no league name extracted")
+                                elif not league_url:
+                                    logger.debug(f"  ❌ Rejected: no league URL extracted")
+                                elif league_name in leagues_found:
+                                    logger.debug(f"  ❌ Rejected: league already found: {league_name}")
 
                         except Exception as e:
                             logger.debug(f"Error processing league link: {e}")
@@ -462,10 +560,11 @@ class URLBuilder:
                     logger.debug(f"Selector '{selector}' failed: {e}")
                     continue
 
-            # Additional discovery: Look for common league patterns in page content
-            if not discovered_leagues:
-                logger.debug("Trying content-based league discovery")
-                discovered_leagues.update(URLBuilder._discover_leagues_from_content(soup, sport))
+            # Disabled content-based discovery as it was returning too many invalid leagues
+            # Rely on direct link discovery only for better quality control
+            # if not discovered_leagues:
+            #     logger.debug("Trying content-based league discovery")
+            #     discovered_leagues.update(URLBuilder._discover_leagues_from_content(soup, sport))
 
             if discovered_leagues:
                 logger.info(f"Successfully discovered {len(discovered_leagues)} leagues for sport '{sport}': {', '.join(list(discovered_leagues.keys())[:10])}{'...' if len(discovered_leagues) > 10 else ''}")
@@ -704,3 +803,335 @@ class URLBuilder:
             url = URLBuilder.get_historic_matches_url(sport, league, season_str, discovered_leagues)
             urls.append((url, season_str))
         return urls
+
+    @staticmethod
+    async def discover_available_markets(sport: str, page, discovered_leagues: Dict[str, str] | None = None) -> Dict[str, str]:
+        """
+        Dynamically discover all available markets for a sport by parsing match page market navigation.
+
+        This function visits a sample match page for the sport and extracts all available market tabs
+        and hidden menu markets to build a complete market mapping.
+
+        Args:
+            sport (str): The sport name (e.g., "aussie-rules", "football", "basketball")
+            page: Playwright page object for navigation
+            discovered_leagues (Dict[str, str] | None): Optional discovered leagues mapping
+
+        Returns:
+            Dict[str, str]: Dictionary mapping normalized market names to their display names
+        """
+        logger = logging.getLogger(__name__)
+
+        try:
+            # Validate sport
+            sport_enum = Sport(sport)
+            logger.info(f"Discovering markets for sport: {sport}")
+
+            # Find a sample match page to analyze markets
+            sample_match_url = await URLBuilder._find_sample_match_url(sport, page, discovered_leagues)
+            if not sample_match_url:
+                logger.warning(f"Could not find sample match URL for {sport}, returning empty markets")
+                return {}
+
+            logger.debug(f"Analyzing markets on sample match page: {sample_match_url}")
+
+            await page.goto(sample_match_url, timeout=15000, wait_until="domcontentloaded")
+            await page.wait_for_timeout(2000)  # Allow content to load
+
+            # Extract markets from page
+            markets = await URLBuilder._extract_markets_from_page(page, sport)
+
+            logger.info(f"Discovered {len(markets)} markets for {sport}: {list(markets.keys())}")
+            return markets
+
+        except Exception as e:
+            logger.error(f"Error discovering markets for {sport}: {e}")
+            return {}
+
+    @staticmethod
+    async def _find_sample_match_url(sport: str, page, discovered_leagues: Dict[str, str] | None = None) -> Optional[str]:
+        """
+        Find a sample match URL for the given sport to analyze markets.
+
+        Enhanced to better utilize discovered leagues for more reliable sample match finding.
+
+        Args:
+            sport (str): The sport name
+            page: Playwright page object
+            discovered_leagues (Dict[str, str] | None): Optional discovered leagues mapping (flat dict: league_name -> league_url)
+
+        Returns:
+            Optional[str]: URL of a sample match page, or None if not found
+        """
+        logger = logging.getLogger(__name__)
+
+        try:
+            # Try to use discovered leagues first (enhanced logic)
+            if discovered_leagues:
+                logger.debug(f"Attempting to use {len(discovered_leagues)} discovered leagues for sample match finding")
+
+                # Try a few different leagues to find one with actual matches
+                league_entries = list(discovered_leagues.items())[:3]  # Try first 3 leagues
+
+                for league_name, league_url in league_entries:
+                    try:
+                        logger.debug(f"Trying discovered league '{league_name}' with URL: {league_url}")
+
+                        await page.goto(league_url, timeout=15000, wait_until="domcontentloaded")
+                        await page.wait_for_timeout(2000)  # Allow page to fully load
+
+                        # Enhanced match selectors for better detection
+                        match_selectors = [
+                            "a[href*='/match/']",
+                            "a[href*='/game/']",
+                            "tr.deactivate[data-date] a[href*='/match/']",  # Specific OddsPortal pattern
+                            "td[class*='match'] a",
+                            "div[class*='match'] a",
+                            "table[class*='table-main'] a[href*='/match/']",
+                            "div[id*='table-matches'] a[href*='/match/']"
+                        ]
+
+                        for selector in match_selectors:
+                            try:
+                                matches = await page.query_selector_all(selector)
+                                if matches:
+                                    # Get the first non-disabled match
+                                    for match in matches[:5]:  # Try first 5 matches
+                                        match_href = await match.get_attribute('href')
+                                        if match_href and not 'deactivate' in (await match.get_attribute('class') or ''):
+                                            full_url = f"{ODDSPORTAL_BASE_URL}{match_href}" if not match_href.startswith('http') else match_href
+                                            logger.debug(f"Found sample match URL from league '{league_name}': {full_url}")
+                                            return full_url
+                            except Exception:
+                                continue
+
+                        logger.debug(f"No matches found on league page for '{league_name}'")
+
+                    except Exception as e:
+                        logger.debug(f"Failed to access league '{league_name}': {e}")
+                        continue
+
+            # Enhanced fallback strategies
+            logger.debug("No matches found in discovered leagues, trying enhanced fallback strategies")
+
+            # Strategy 1: Try the main sport page with latest results
+            fallback_urls = [
+                f"{ODDSPORTAL_BASE_URL}/{sport}/results/",
+                f"{ODDSPORTAL_BASE_URL}/{sport}/",
+                f"{ODDSPORTAL_BASE_URL}/{sport}/australia/",  # Try Australia as common fallback
+                f"{ODDSPORTAL_BASE_URL}/{sport}/england/",   # Try England as common fallback
+            ]
+
+            for fallback_url in fallback_urls:
+                try:
+                    logger.debug(f"Trying fallback URL: {fallback_url}")
+
+                    await page.goto(fallback_url, timeout=15000, wait_until="domcontentloaded")
+                    await page.wait_for_timeout(2000)
+
+                    # Same enhanced match selectors
+                    match_selectors = [
+                        "a[href*='/match/']",
+                        "a[href*='/game/']",
+                        "tr.deactivate[data-date] a[href*='/match/']",
+                        "td[class*='match'] a",
+                        "div[class*='match'] a",
+                        "table[class*='table-main'] a[href*='/match/']",
+                    ]
+
+                    for selector in match_selectors:
+                        try:
+                            matches = await page.query_selector_all(selector)
+                            if matches:
+                                for match in matches[:3]:
+                                    match_href = await match.get_attribute('href')
+                                    if match_href:
+                                        full_url = f"{ODDSPORTAL_BASE_URL}{match_href}" if not match_href.startswith('http') else match_href
+                                        logger.debug(f"Found sample match URL from fallback: {full_url}")
+                                        return full_url
+                        except Exception:
+                            continue
+
+                except Exception as e:
+                    logger.debug(f"Fallback URL {fallback_url} failed: {e}")
+                    continue
+
+            # Last resort: return None to indicate failure
+            logger.warning(f"All strategies failed to find sample match URL for sport '{sport}'")
+            return None
+
+        except Exception as e:
+            logger.error(f"Critical error finding sample match URL for {sport}: {e}")
+            return None
+
+    @staticmethod
+    async def _extract_markets_from_page(page, sport: str) -> Dict[str, str]:
+        """
+        Extract market information from a match page.
+
+        Args:
+            page: Playwright page object loaded with a match page
+            sport (str): The sport name
+
+        Returns:
+            Dict[str, str]: Dictionary mapping normalized market names to display names
+        """
+        logger = logging.getLogger(__name__)
+        markets = {}
+
+        try:
+            # Look for market tabs in navigation
+            market_tab_selectors = [
+                "li[class*='odds-item'] span div",
+                "div[class*='market-tab']",
+                "ul[class*='markets'] li",
+                "div[class*='betting-market'] span"
+            ]
+
+            for selector in market_tab_selectors:
+                try:
+                    elements = await page.query_selector_all(selector)
+                    for element in elements:
+                        try:
+                            market_text = await element.inner_text()
+                            if market_text and len(market_text.strip()) > 0:
+                                normalized_market = URLBuilder._normalize_market_name(market_text.strip())
+                                markets[normalized_market] = market_text.strip()
+                        except Exception:
+                            continue
+                except Exception:
+                    continue
+
+            # Look for hidden menu markets
+            hidden_market_selectors = [
+                "li[class*='snap-right'] a div",
+                "div[class*='hide-menu'] a",
+                "ul[class*='dropdown'] a",
+                "div[class*='more-markets'] a"
+            ]
+
+            for selector in hidden_market_selectors:
+                try:
+                    elements = await page.query_selector_all(selector)
+                    for element in elements:
+                        try:
+                            market_text = await element.inner_text()
+                            if market_text and len(market_text.strip()) > 0:
+                                normalized_market = URLBuilder._normalize_market_name(market_text.strip())
+                                markets[normalized_market] = market_text.strip()
+                        except Exception:
+                            continue
+                except Exception:
+                    continue
+
+            # Add common markets if not found (fallback)
+            common_markets = URLBuilder._get_common_markets_for_sport(sport)
+            for market_name, display_name in common_markets.items():
+                if market_name not in markets:
+                    markets[market_name] = display_name
+
+            return markets
+
+        except Exception as e:
+            logger.error(f"Error extracting markets from page for {sport}: {e}")
+            # Return fallback markets on error
+            return URLBuilder._get_common_markets_for_sport(sport)
+
+    @staticmethod
+    def _normalize_market_name(market_name: str) -> str:
+        """
+        Normalize market name to a consistent identifier format.
+
+        Args:
+            market_name (str): Raw market name from page
+
+        Returns:
+            str: Normalized market name
+        """
+        import re
+
+        # Convert to lowercase and remove special characters
+        normalized = market_name.lower()
+
+        # Common replacements
+        replacements = {
+            'home/away': 'home_away',
+            'over/under': 'over_under',
+            'asian handicap': 'handicap',
+            'draw no bet': 'draw_no_bet',
+            'odd or even': 'odd_even',
+            'double chance': 'double_chance',
+            'both teams to score': 'both_teams_to_score',
+            'correct score': 'correct_score',
+            'half time/full time': 'half_time_full_time'
+        }
+
+        for old, new in replacements.items():
+            normalized = normalized.replace(old, new)
+
+        # Remove non-alphanumeric characters except underscore
+        normalized = re.sub(r'[^a-z0-9_]', '', normalized)
+
+        # Replace multiple underscores with single
+        normalized = re.sub(r'_+', '_', normalized)
+
+        # Remove leading/trailing underscores
+        normalized = normalized.strip('_')
+
+        return normalized if normalized else 'unknown'
+
+    @staticmethod
+    def _get_common_markets_for_sport(sport: str) -> Dict[str, str]:
+        """
+        Get common markets for a sport as fallback.
+
+        Args:
+            sport (str): The sport name
+
+        Returns:
+            Dict[str, str]: Dictionary of common markets for the sport
+        """
+        common_markets = {
+            # Universal markets
+            '1x2': '1X2',
+            'home_away': 'Home/Away',
+            'over_under': 'Over/Under',
+            'handicap': 'Handicap',
+            'draw_no_bet': 'Draw No Bet',
+            'double_chance': 'Double Chance',
+            'correct_score': 'Correct Score',
+            'half_time_full_time': 'Half Time/Full Time',
+            'odd_even': 'Odd or Even',
+
+            # Team-based markets
+            'both_teams_to_score': 'Both Teams to Score',
+        }
+
+        # Sport-specific common markets
+        sport_specific = {
+            'aussie-rules': {
+                'margin': 'Winning Margin',
+                'first_goalscorer': 'First Goalscorer',
+            },
+            'football': {
+                'both_teams_to_score': 'Both Teams to Score',
+                'goalscorer': 'Goalscorer',
+                'cards': 'Cards',
+                'corners': 'Corners',
+            },
+            'basketball': {
+                'points': 'Points',
+                'rebounds': 'Rebounds',
+                'assists': 'Assists',
+            },
+            'tennis': {
+                'set_winner': 'Set Winner',
+                'game_winner': 'Game Winner',
+                'total_games': 'Total Games',
+            }
+        }
+
+        if sport in sport_specific:
+            common_markets.update(sport_specific[sport])
+
+        return common_markets

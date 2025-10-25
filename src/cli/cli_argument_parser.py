@@ -88,7 +88,7 @@ class CLIArgumentParser:
         parser.add_argument(
             "--markets",
             type=lambda s: s.split(","),
-            help="� Comma-separated list of markets to scrape, or 'all' for all markets (e.g., 1x2,btts).",
+            help="📊 Comma-separated list of markets to scrape, 'all' for auto-discovery of all available markets, or leave empty for automatic market discovery (default: auto-discovery). Example: 1x2,btts or 'all'.",
         )
         parser.add_argument(
             "--storage",

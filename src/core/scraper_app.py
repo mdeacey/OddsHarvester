@@ -7,16 +7,91 @@ from src.core.browser_helper import BrowserHelper
 from src.core.odds_portal_market_extractor import OddsPortalMarketExtractor
 from src.core.odds_portal_scraper import OddsPortalScraper
 from src.core.playwright_manager import PlaywrightManager
-from src.core.sport_market_registry import SportMarketRegistrar
+from src.core.sport_market_registry import SportMarketRegistrar, SportMarketRegistry
 from src.core.url_builder import URLBuilder
 from src.utils.command_enum import CommandEnum
 from src.utils.date_utils import parse_flexible_date, format_date_for_oddsportal
 from src.utils.proxy_manager import ProxyManager
 from src.utils.sport_market_constants import Sport
+from src.utils.constants import ODDSPORTAL_BASE_URL
 
 logger = logging.getLogger("ScraperApp")
 MAX_RETRIES = 3
 RETRY_DELAY_SECONDS = 20
+
+
+async def _ensure_market_auto_discovery(sports: str, page, discovered_leagues: Dict[str, str] | None = None) -> list[str]:
+    """
+    Universal market auto-discovery function that eliminates hardcoded market defaults.
+
+    This function implements universal market auto-discovery as the default behavior,
+    ensuring that only markets that actually exist for the specific sport and time period
+    are attempted to be scraped.
+
+    Args:
+        sports (str): The sport name
+        page: Playwright page object for navigation
+        discovered_leagues (Dict[str, str] | None): Optional discovered leagues for better sample match finding
+
+    Returns:
+        list[str]: List of discovered market names that actually exist for this sport
+
+    Raises:
+        ValueError: If market discovery fails completely - no silent fallbacks
+    """
+    logger.info(f"Performing universal market auto-discovery for sport '{sports}'")
+
+    try:
+        # Check if we already have discovered markets cached
+        if SportMarketRegistry.has_discovered_markets(sports):
+            cached_markets = SportMarketRegistry.get_discovered_markets(sports)
+            if cached_markets:
+                logger.info(f"Using {len(cached_markets)} cached discovered markets for '{sports}': {list(cached_markets.keys())}")
+                return list(cached_markets.keys())
+
+        # Perform market discovery with enhanced error handling
+        logger.debug(f"Starting market discovery for '{sports}' with {len(discovered_leagues) if discovered_leagues else 0} discovered leagues")
+        discovered_markets = await URLBuilder.discover_available_markets(sports, page, discovered_leagues)
+
+        if not discovered_markets:
+            # Enhanced error message with troubleshooting guidance
+            error_msg = (
+                f"No markets discovered for sport '{sports}'. "
+                f"This could indicate:\n"
+                f"  1. The sport has no available markets on OddsPortal\n"
+                f"  2. Network connectivity issues\n"
+                f"  3. OddsPortal page structure changes\n"
+                f"  4. Temporary site unavailability\n"
+                f"Please check the sport name and try again later."
+            )
+            logger.error(error_msg)
+            raise ValueError(error_msg)
+
+        # Register discovered markets with the registry
+        SportMarketRegistry.register_discovered_markets(sports, discovered_markets)
+
+        market_names = list(discovered_markets.keys())
+        logger.info(f"Successfully discovered and registered {len(market_names)} markets for '{sports}': {market_names}")
+
+        return market_names
+
+    except ValueError:
+        # Re-raise ValueError as-is (already our custom error)
+        raise
+    except Exception as e:
+        # Enhanced error handling for different types of failures
+        error_msg = f"Market auto-discovery failed for sport '{sports}': {e}"
+        logger.error(error_msg)
+
+        # Include troubleshooting information for common issues
+        if "timeout" in str(e).lower():
+            logger.error("Timeout occurred during market discovery. This could be due to slow network or OddsPortal being unresponsive.")
+        elif "navigation" in str(e).lower() or "goto" in str(e).lower():
+            logger.error("Navigation error occurred. OddsPortal might be temporarily unavailable or blocking access.")
+        elif "selector" in str(e).lower():
+            logger.error("Page structure error occurred. OddsPortal might have updated their page layout.")
+
+        raise ValueError(error_msg) from e
 TRANSIENT_ERRORS = (
     "ERR_CONNECTION_RESET",
     "ERR_CONNECTION_TIMED_OUT",
@@ -90,6 +165,10 @@ async def run_scraper(
         )
 
         if match_links and sports:
+            # Universal market auto-discovery: always discover markets unless explicitly provided
+            if not markets or (len(markets) == 1 and markets[0] == 'all'):
+                markets = await _ensure_market_auto_discovery(sports, scraper.playwright_manager.page)
+
             logger.info(f"""
                 Scraping specific matches: {match_links} for sport: {sports}, markets={markets},
                 scrape_odds_history={scrape_odds_history}, target_bookmaker={target_bookmaker}
@@ -146,6 +225,10 @@ async def run_scraper(
             # Handle --leagues all by converting to None for auto-discovery
             if leagues and len(leagues) == 1 and leagues[0] == 'all':
                 leagues = None
+
+            # Universal market auto-discovery: always discover markets unless explicitly provided
+            if not markets or (len(markets) == 1 and markets[0] == 'all'):
+                markets = await _ensure_market_auto_discovery(sports, scraper.playwright_manager.page)
 
             if leagues is None:
                 # No leagues specified - use auto-discovery for all leagues
@@ -220,6 +303,10 @@ async def run_scraper(
             # Handle --leagues all by converting to None for auto-discovery
             if leagues and len(leagues) == 1 and leagues[0] == 'all':
                 leagues = None
+
+            # Universal market auto-discovery: always discover markets unless explicitly provided
+            if not markets or (len(markets) == 1 and markets[0] == 'all'):
+                markets = await _ensure_market_auto_discovery(sports, scraper.playwright_manager.page)
 
             if leagues:
                 logger.info(f"""
@@ -692,7 +779,13 @@ async def _scrape_historic_all_leagues(scraper, sports: str, from_date: str, to_
     for league_name, league_url in leagues.items():
         try:
             logger.info(f"Scraping league '{league_name}' for sport '{sports}' from {from_date} to {to_date}")
-            league_results = await _scrape_historic_date_range(scraper, sports, league_name, from_date, to_date, leagues, **kwargs)
+
+            # For auto-discovery scenario, pass the discovered league URL to enable proper filtering
+            # The discovered_leagues dict contains the correct mapping from league names to URLs
+            enhanced_leagues = {league_name: league_url}
+            league_results = await _scrape_historic_date_range(
+                scraper, sports, league_name, from_date, to_date, enhanced_leagues, **kwargs
+            )
             all_results.extend(league_results)
             logger.info(f"Successfully scraped {len(league_results)} matches from league '{league_name}'")
         except Exception as e:
@@ -730,11 +823,24 @@ async def _scrape_historic_date_range(scraper, sports: str, league: str, from_da
     Returns:
         List of combined results from all seasons
     """
-    # Always use auto-discovery when league is "all" - standard date range doesn't make sense for unknown leagues
-    if league == "all":
-        logger.info(f"Auto-discovering exact available seasons for {sports}/all leagues")
+    # Use auto-discovery when:
+    # 1. league is "all" - standard date range doesn't make sense for unknown leagues
+    # 2. to_date is "now" and from_date is None - this indicates exact seasons discovery should be used
+    if league == "all" or (to_date == "now" and from_date is None):
+        if league == "all":
+            logger.info(f"Auto-discovering exact available seasons for {sports}/all leagues")
+        else:
+            logger.info(f"Auto-discovering exact available seasons for {sports}/{league} (to_date=now, from_date=None)")
+
+        # For specific leagues with exact seasons discovery, create minimal discovered_leagues if None
+        if discovered_leagues is None and league != "all":
+            # Construct the URL for the specific league
+            league_url = f"{ODDSPORTAL_BASE_URL}/{sports}/australia/{league}/results/"
+            discovered_leagues = {league: league_url}
+            logger.debug(f"Created minimal discovered_leagues for exact seasons discovery: {discovered_leagues}")
+
         try:
-            # Auto-discover exact seasons for all leagues
+            # Auto-discover exact seasons
             discovered_seasons = await URLBuilder.discover_available_seasons(
                 sports, league, scraper.playwright_manager.page, discovered_leagues
             )
@@ -746,7 +852,7 @@ async def _scrape_historic_date_range(scraper, sports: str, league: str, from_da
             # No fallback - if discovery fails, there's a real problem with auto-discovery
             raise
     else:
-        # For specific leagues, use standard date range
+        # For specific leagues with date ranges, use standard date range
         try:
             urls_with_seasons = URLBuilder.get_historic_matches_urls_for_range(sports, from_date, to_date, league, discovered_leagues or {})
         except ValueError as e:
@@ -764,7 +870,7 @@ async def _scrape_historic_date_range(scraper, sports: str, league: str, from_da
 
             season_data = await retry_scrape(
                 scraper.scrape_historic,
-                sport=sports,
+                sports=sports,
                 league=league,
                 season=season_str,
                 discovered_leagues=discovered_leagues,

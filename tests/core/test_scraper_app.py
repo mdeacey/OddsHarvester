@@ -9,7 +9,7 @@ from src.core.odds_portal_scraper import OddsPortalScraper
 from src.core.playwright_manager import PlaywrightManager
 from src.core.scraper_app import (
     TRANSIENT_ERRORS, _scrape_multiple_leagues, _scrape_all_sports, _scrape_all_sports_date_range,
-    _scrape_multiple_leagues_date_range, retry_scrape, run_scraper
+    _scrape_multiple_leagues_date_range, retry_scrape, run_scraper, _ensure_market_auto_discovery
 )
 from src.utils.command_enum import CommandEnum
 
@@ -1319,3 +1319,113 @@ async def test_scrape_historic_with_discovered_leagues_parameter(
         mock_url_builder.get_historic_matches_urls_for_range.assert_called_once_with(
             "football", "2023", "2023", "all", {"test-league": "https://test.url"}
         )
+
+
+@pytest.mark.asyncio
+@patch("src.core.scraper_app.OddsPortalScraper")
+@patch("src.core.scraper_app.OddsPortalMarketExtractor")
+@patch("src.core.scraper_app.BrowserHelper")
+@patch("src.core.scraper_app.PlaywrightManager")
+@patch("src.core.scraper_app.ProxyManager")
+@patch("src.core.scraper_app.SportMarketRegistrar")
+async def test_run_scraper_auto_discovery_when_no_markets(
+    sport_market_registrar_mock,
+    proxy_manager_mock,
+    playwright_manager_mock,
+    browser_helper_mock,
+    market_extractor_mock,
+    scraper_cls_mock,
+    setup_mocks,
+):
+    """Test that run_scraper performs auto-discovery when no markets are specified (ACC-XXX)."""
+    scraper_mock = setup_mocks["scraper_mock"]
+    scraper_cls_mock.return_value = scraper_mock
+
+    proxy_manager_instance = MagicMock()
+    proxy_manager_instance.get_current_proxy.return_value = {"server": "test-proxy"}
+    proxy_manager_mock.return_value = proxy_manager_instance
+
+    # Mock the auto-discovery function
+    discovered_markets = ["1x2", "over_under_2_5", "btts"]
+
+    with patch("src.core.scraper_app._ensure_market_auto_discovery", new_callable=AsyncMock) as auto_discovery_mock:
+        auto_discovery_mock.return_value = discovered_markets
+
+        with patch("src.core.scraper_app._scrape_single_league_date_range") as date_range_mock:
+            date_range_mock.return_value = [{"result": "historic_data"}]
+
+            # Call run_scraper without specifying markets
+            result = await run_scraper(
+                command=CommandEnum.HISTORIC,
+                sports="football",
+                leagues=["england-premier-league"],
+                from_date="2023",
+                to_date="2023",
+                markets=None,  # No markets specified - should trigger auto-discovery
+                max_pages=2,
+                headless=True,
+            )
+
+            # Verify auto-discovery was called
+            auto_discovery_mock.assert_called_once_with("football", scraper_mock.playwright_manager.page)
+
+            # Verify the discovered markets were passed to the date range function
+            date_range_mock.assert_called_once()
+            call_args = date_range_mock.call_args
+            assert call_args[1]["markets"] == discovered_markets  # Should use discovered markets, not None
+
+            scraper_mock.stop_playwright.assert_called_once()
+            assert result == [{"result": "historic_data"}]
+
+
+@pytest.mark.asyncio
+@patch("src.core.scraper_app.OddsPortalScraper")
+@patch("src.core.scraper_app.OddsPortalMarketExtractor")
+@patch("src.core.scraper_app.BrowserHelper")
+@patch("src.core.scraper_app.PlaywrightManager")
+@patch("src.core.scraper_app.ProxyManager")
+@patch("src.core.scraper_app.SportMarketRegistrar")
+async def test_run_scraper_auto_discovery_with_all_markets(
+    sport_market_registrar_mock,
+    proxy_manager_mock,
+    playwright_manager_mock,
+    browser_helper_mock,
+    market_extractor_mock,
+    scraper_cls_mock,
+    setup_mocks,
+):
+    """Test that run_scraper performs auto-discovery when markets=['all'] is specified."""
+    scraper_mock = setup_mocks["scraper_mock"]
+    scraper_cls_mock.return_value = scraper_mock
+
+    proxy_manager_instance = MagicMock()
+    proxy_manager_instance.get_current_proxy.return_value = {"server": "test-proxy"}
+    proxy_manager_mock.return_value = proxy_manager_instance
+
+    # Mock the auto-discovery function
+    discovered_markets = ["1x2", "over_under_2_5", "btts", "handicap"]
+
+    with patch("src.core.scraper_app._ensure_market_auto_discovery", new_callable=AsyncMock) as auto_discovery_mock:
+        auto_discovery_mock.return_value = discovered_markets
+
+        with patch("src.core.scraper_app.retry_scrape") as retry_scrape_mock:
+            retry_scrape_mock.return_value = [{"result": "match_data"}]
+
+            # Call run_scraper with markets=['all']
+            result = await run_scraper(
+                command=CommandEnum.HISTORIC,  # Doesn't matter for this test
+                match_links=["https://oddsportal.com/match1"],
+                sports="football",
+                markets=["all"],  # Should trigger auto-discovery
+                scrape_odds_history=True,
+            )
+
+            # Verify auto-discovery was called
+            auto_discovery_mock.assert_called_once_with("football", scraper_mock.playwright_manager.page)
+
+            # Verify the discovered markets were used
+            retry_scrape_mock.assert_called_once()
+            call_args = retry_scrape_mock.call_args
+            assert call_args[1]["markets"] == discovered_markets  # Should use discovered markets
+
+            assert result == [{"result": "match_data"}]

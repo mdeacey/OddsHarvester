@@ -290,7 +290,10 @@ class TestGetHistoricMatchesUrlsForRange:
         )
         assert len(urls_with_seasons) == 1
         url, season_str = urls_with_seasons[0]
-        assert url == f"{ODDSPORTAL_BASE_URL}/football/england/premier-league-{current_year}/results/"
+        # The discovered leagues URL pattern doesn't include the year in the base URL
+        # It just uses the base league URL with /results/ appended
+        expected_url = f"{discovered_leagues['england-premier-league']}/results/"
+        assert url == expected_url
         assert season_str == str(current_year)
 
     def test_invalid_season_format(self, discovered_leagues):
@@ -604,17 +607,21 @@ class TestSportsParameterUpdates:
         mock_page.query_selector_all = AsyncMock(return_value=[])
         mock_page.content = AsyncMock(return_value='<html>Season 2020-2021 Season 2021-2022 Season 2022-2023</html>')
 
-        # Test with various sports values
-        test_sports = ["football", "tennis", "basketball", "aussie-rules"]
+        # Test with various sports values and their corresponding valid leagues
+        test_cases = [
+            ("football", "england-premier-league"),
+            ("tennis", "atp-tour"),
+            ("baseball", "mlb"),  # Using baseball which has mlb league
+        ]
 
-        for sport in test_sports:
+        for sport, league in test_cases:
             # Reset mocks
             mock_page.goto.reset_mock()
             mock_page.wait_for_timeout.reset_mock()
 
             # Call the method under test
             seasons = await URLBuilder.discover_available_seasons(
-                sport, "test-league", mock_page, discovered_leagues
+                sport, league, mock_page, discovered_leagues
             )
 
             # Verify page.goto was called with correct URL containing sport
@@ -627,7 +634,7 @@ class TestSportsParameterUpdates:
             assert seasons == expected_seasons
 
     @pytest.mark.asyncio
-    async def test_discover_available_seasons_logging_uses_sports_parameter(self):
+    async def test_discover_available_seasons_logging_uses_sports_parameter(self, discovered_leagues):
         """Test that logging messages use the correct sports parameter."""
         from unittest.mock import AsyncMock, patch
         import logging
@@ -643,21 +650,21 @@ class TestSportsParameterUpdates:
             mock_logger = MagicMock()
             mock_get_logger.return_value = mock_logger
 
-            # Call the method with aussie-rules sport
+            # Call the method with tennis sport (using valid league)
             await URLBuilder.discover_available_seasons(
-                "aussie-rules", "afl", mock_page
+                "tennis", "atp-tour", mock_page, discovered_leagues
             )
 
             # Verify that debug log messages contain the correct sport name
             debug_calls = [str(call) for call in mock_logger.debug.call_args_list]
-            assert any("aussie-rules/afl" in call for call in debug_calls)
+            assert any("tennis/atp-tour" in call for call in debug_calls)
 
             # Verify that info log messages contain the correct sport name
             info_calls = [str(call) for call in mock_logger.info.call_args_list]
-            assert any("aussie-rules/afl" in call for call in info_calls)
+            assert any("tennis/atp-tour" in call for call in info_calls)
 
     @pytest.mark.asyncio
-    async def test_discover_available_seasons_error_handling_uses_sports_parameter(self):
+    async def test_discover_available_seasons_error_handling_uses_sports_parameter(self, discovered_leagues):
         """Test that error handling uses the correct sports parameter in error messages."""
         from unittest.mock import AsyncMock
 
@@ -668,13 +675,13 @@ class TestSportsParameterUpdates:
         mock_page.content = AsyncMock(return_value='<html>No seasons here</html>')
 
         # Test that error messages contain the correct sport name
-        with pytest.raises(ValueError, match="No seasons discovered on league page for basketball/nba"):
+        with pytest.raises(ValueError, match="No seasons discovered on league page for football/england-premier-league"):
             await URLBuilder.discover_available_seasons(
-                "basketball", "nba", mock_page
+                "football", "england-premier-league", mock_page, discovered_leagues
             )
 
     @pytest.mark.asyncio
-    async def test_discover_available_seasons_exception_propagation_uses_sports_parameter(self):
+    async def test_discover_available_seasons_exception_propagation_uses_sports_parameter(self, discovered_leagues):
         """Test that exception propagation uses the correct sports parameter."""
         from unittest.mock import AsyncMock
 
@@ -684,7 +691,7 @@ class TestSportsParameterUpdates:
         # Test that exceptions are properly raised and contain sport-specific context
         with pytest.raises(Exception, match="Navigation failed for tennis"):
             await URLBuilder.discover_available_seasons(
-                "tennis", "atp-tour", mock_page
+                "tennis", "atp-tour", mock_page, discovered_leagues
             )
 
         # Verify the method was called with correct sport
@@ -714,7 +721,7 @@ class TestSportsParameterUpdates:
         )
 
         # Verify the correct URL was constructed and called
-        expected_url = "https://oddsportal.com/afl/australia/afl/results/"
+        expected_url = "https://oddsportal.com/afl/australia/afl"
         mock_page.goto.assert_called_once_with(expected_url, timeout=15000, wait_until="domcontentloaded")
 
         # Should find seasons 2019, 2020, and 2021
@@ -783,3 +790,577 @@ class TestSportsParameterUpdates:
             # Verify correct URL was called
             expected_url = f"https://oddsportal.com/{expected_path}/results/"
             mock_page.goto.assert_called_once_with(expected_url, timeout=15000, wait_until="domcontentloaded")
+
+
+class TestAutoDiscoveryErrorHandling:
+    """Test error handling for league and season auto-discovery functionality."""
+
+    @pytest.mark.asyncio
+    async def test_discover_leagues_empty_response(self):
+        """Test league discovery with empty HTML response."""
+        with (
+            patch('src.core.url_builder.requests.get') as mock_get,
+            patch('src.core.url_builder.BeautifulSoup') as mock_bs,
+            patch('src.core.url_builder.logging.getLogger') as mock_get_logger,
+        ):
+            mock_response = MagicMock()
+            mock_response.status_code = 200
+            mock_response.text = "<html><body></body></html>"  # Empty content
+            mock_get.return_value = mock_response
+
+            mock_soup = MagicMock()
+            mock_soup.select.side_effect = []  # No elements found
+            mock_bs.return_value = mock_soup
+
+            mock_logger = MagicMock()
+            mock_get_logger.return_value = mock_logger
+
+            result = await URLBuilder.discover_leagues("football")
+
+            # Should return empty list for empty response
+            assert result == []
+
+            # Should log the discovery attempt
+            mock_logger.info.assert_called()
+            mock_logger.debug.assert_called()
+
+    @pytest.mark.asyncio
+    async def test_discover_leagues_network_error(self):
+        """Test league discovery with network error."""
+        with (
+            patch('src.core.url_builder.requests.get') as mock_get,
+            patch('src.core.url_builder.logging.getLogger') as mock_get_logger,
+        ):
+            # Simulate network error
+            mock_get.side_effect = Exception("Network error: Connection refused")
+
+            mock_logger = MagicMock()
+            mock_get_logger.return_value = mock_logger
+
+            with pytest.raises(Exception, match="Network error: Connection refused"):
+                await URLBuilder.discover_leagues("football")
+
+            # Should log the error
+            mock_logger.error.assert_called()
+
+    @pytest.mark.asyncio
+    async def test_discover_leagues_http_error_status(self):
+        """Test league discovery with HTTP error status codes."""
+        with (
+            patch('src.core.url_builder.requests.get') as mock_get,
+            patch('src.core.url_builder.logging.getLogger') as mock_get_logger,
+        ):
+            mock_response = MagicMock()
+            mock_response.status_code = 404
+            mock_response.raise_for_status.side_effect = Exception("404 Not Found")
+            mock_get.return_value = mock_response
+
+            mock_logger = MagicMock()
+            mock_get_logger.return_value = mock_logger
+
+            with pytest.raises(Exception, match="404 Not Found"):
+                await URLBuilder.discover_leagues("football")
+
+            # Should log the HTTP error
+            mock_logger.error.assert_called()
+
+    @pytest.mark.asyncio
+    async def test_discover_leagues_malformed_html(self):
+        """Test league discovery with malformed HTML."""
+        with (
+            patch('src.core.url_builder.requests.get') as mock_get,
+            patch('src.core.url_builder.BeautifulSoup') as mock_bs,
+            patch('src.core.url_builder.logging.getLogger') as mock_get_logger,
+        ):
+            mock_response = MagicMock()
+            mock_response.status_code = 200
+            mock_response.text = "<html><body>broken html<a href='incomplete"
+            mock_get.return_value = mock_response
+
+            mock_soup = MagicMock()
+            # Simulate HTML parsing error
+            mock_bs.side_effect = Exception("HTML parsing error")
+            mock_logger = MagicMock()
+            mock_get_logger.return_value = mock_logger
+
+            with pytest.raises(Exception, match="HTML parsing error"):
+                await URLBuilder.discover_leagues("football")
+
+            # Should log the parsing error
+            mock_logger.error.assert_called()
+
+    @pytest.mark.asyncio
+    async def test_discover_available_seasons_empty_response(self):
+        """Test season discovery with empty HTML response."""
+        from unittest.mock import AsyncMock
+
+        mock_page = AsyncMock()
+        mock_page.goto = AsyncMock()
+        mock_page.wait_for_timeout = AsyncMock()
+        mock_page.query_selector_all = AsyncMock(return_value=[])
+        mock_page.content = AsyncMock(return_value='<html><body></body></html>')  # Empty content
+
+        with (
+            patch('src.core.url_builder.logging.getLogger') as mock_get_logger,
+        ):
+            mock_logger = MagicMock()
+            mock_get_logger.return_value = mock_logger
+
+            with pytest.raises(ValueError, match="No seasons discovered on league page"):
+                await URLBuilder.discover_available_seasons("football", "england-premier-league", mock_page)
+
+            # Should log the discovery attempt
+            mock_logger.info.assert_called()
+
+    @pytest.mark.asyncio
+    async def test_discover_available_seasons_navigation_error(self):
+        """Test season discovery with navigation error."""
+        from unittest.mock import AsyncMock
+
+        mock_page = AsyncMock()
+        mock_page.goto.side_effect = Exception("Navigation failed: timeout")
+
+        with (
+            patch('src.core.url_builder.logging.getLogger') as mock_get_logger,
+        ):
+            mock_logger = MagicMock()
+            mock_get_logger.return_value = mock_logger
+
+            with pytest.raises(Exception, match="Navigation failed: timeout"):
+                await URLBuilder.discover_available_seasons("football", "england-premier-league", mock_page)
+
+            # Should log the error
+            mock_logger.error.assert_called()
+
+    @pytest.mark.asyncio
+    async def test_discover_available_seasons_invalid_league_url(self):
+        """Test season discovery with invalid league URL causing 404."""
+        from unittest.mock import AsyncMock
+
+        mock_page = AsyncMock()
+        mock_page.goto.side_effect = Exception("404 Page Not Found")
+
+        with (
+            patch('src.core.url_builder.logging.getLogger') as mock_get_logger,
+        ):
+            mock_logger = MagicMock()
+            mock_get_logger.return_value = mock_logger
+
+            with pytest.raises(Exception, match="404 Page Not Found"):
+                await URLBuilder.discover_available_seasons("football", "nonexistent-league", mock_page)
+
+            # Should log the 404 error for nonexistent league
+            mock_logger.error.assert_called()
+
+    @pytest.mark.asyncio
+    async def test_discover_leagues_invalid_sport_url(self):
+        """Test league discovery with invalid sport URL."""
+        with (
+            patch('src.core.url_builder.requests.get') as mock_get,
+            patch('src.core.url_builder.logging.getLogger') as mock_get_logger,
+        ):
+            mock_response = MagicMock()
+            mock_response.status_code = 404
+            mock_response.raise_for_status.side_effect = Exception("404 Sport Not Found")
+            mock_get.return_value = mock_response
+
+            mock_logger = MagicMock()
+            mock_get_logger.return_value = mock_logger
+
+            with pytest.raises(Exception, match="404 Sport Not Found"):
+                await URLBuilder.discover_leagues("nonexistent-sport")
+
+            # Should log the error for invalid sport
+            mock_logger.error.assert_called()
+
+    @pytest.mark.asyncio
+    async def test_discover_leagues_partial_content_with_errors(self):
+        """Test league discovery with partial content that has some errors."""
+        with (
+            patch('src.core.url_builder.requests.get') as mock_get,
+            patch('src.core.url_builder.BeautifulSoup') as mock_bs,
+            patch('src.core.url_builder.logging.getLogger') as mock_get_logger,
+        ):
+            mock_response = MagicMock()
+            mock_response.status_code = 200
+            mock_response.text = "<html><body>partial content</body></html>"
+            mock_get.return_value = mock_response
+
+            # Simulate some elements found, but with errors in processing some
+            mock_links = [
+                MagicMock(href="/football/england/premier-league/", text="Premier League"),
+                MagicMock(href="/football/invalid-link", text=""),  # Empty text
+                None,  # None element
+            ]
+            mock_soup = MagicMock()
+            mock_soup.select.return_value = mock_links
+            mock_bs.return_value = mock_soup
+
+            mock_logger = MagicMock()
+            mock_get_logger.return_value = mock_logger
+
+            result = await URLBuilder.discover_leagues("football")
+
+            # Should return valid leagues only (skip invalid ones)
+            assert len(result) == 1
+            assert result[0]["name"] == "Premier League"
+
+            # Should log warnings about skipped invalid leagues
+            mock_logger.warning.assert_called()
+
+    @pytest.mark.asyncio
+    async def test_discover_available_seasons_partial_content_with_errors(self):
+        """Test season discovery with partial content that has some errors."""
+        from unittest.mock import AsyncMock
+
+        mock_page = AsyncMock()
+        mock_page.goto = AsyncMock()
+        mock_page.wait_for_timeout = AsyncMock()
+
+        # Simulate some season elements found, but with errors
+        mock_seasons = [
+            MagicMock(text="2024", get=lambda x, default=None: "2024"),
+            MagicMock(text="", get=lambda x, default=None: None),  # Empty text
+            None,  # None element
+        ]
+        mock_page.query_selector_all = AsyncMock(return_value=mock_seasons)
+        mock_page.content = AsyncMock(return_value='<html>partial season content</html>')
+
+        with (
+            patch('src.core.url_builder.logging.getLogger') as mock_get_logger,
+        ):
+            mock_logger = MagicMock()
+            mock_get_logger.return_value = mock_logger
+
+            seasons = await URLBuilder.discover_available_seasons("football", "england-premier-league", mock_page)
+
+            # Should return valid seasons only
+            assert len(seasons) == 1
+            assert seasons[0] == 2024
+
+            # Should log warnings about skipped invalid seasons
+            mock_logger.warning.assert_called()
+
+    @pytest.mark.asyncio
+    async def test_discover_leagues_ssl_error(self):
+        """Test league discovery with SSL certificate error."""
+        with (
+            patch('src.core.url_builder.requests.get') as mock_get,
+            patch('src.core.url_builder.logging.getLogger') as mock_get_logger,
+        ):
+            # Simulate SSL error
+            import requests
+            mock_get.side_effect = requests.exceptions.SSLError("SSL verification failed")
+
+            mock_logger = MagicMock()
+            mock_get_logger.return_value = mock_logger
+
+            with pytest.raises(requests.exceptions.SSLError, match="SSL verification failed"):
+                await URLBuilder.discover_leagues("football")
+
+            # Should log the SSL error
+            mock_logger.error.assert_called()
+
+    @pytest.mark.asyncio
+    async def test_discover_available_seasons_connection_timeout(self):
+        """Test season discovery with connection timeout."""
+        from unittest.mock import AsyncMock
+
+        mock_page = AsyncMock()
+        mock_page.goto.side_effect = Exception("Connection timed out")
+
+        with (
+            patch('src.core.url_builder.logging.getLogger') as mock_get_logger,
+        ):
+            mock_logger = MagicMock()
+            mock_get_logger.return_value = mock_logger
+
+            with pytest.raises(Exception, match="Connection timed out"):
+                await URLBuilder.discover_available_seasons("football", "england-premier-league", mock_page)
+
+            # Should log the timeout error
+            mock_logger.error.assert_called()
+
+    @pytest.mark.asyncio
+    async def test_discover_available_seasons_page_content_error(self):
+        """Test season discovery when page.content() fails."""
+        from unittest.mock import AsyncMock
+
+        mock_page = AsyncMock()
+        mock_page.goto = AsyncMock()
+        mock_page.wait_for_timeout = AsyncMock()
+        mock_page.query_selector_all = AsyncMock(return_value=[])
+        mock_page.content = AsyncMock(side_effect=Exception("Failed to get page content"))
+
+        with (
+            patch('src.core.url_builder.logging.getLogger') as mock_get_logger,
+        ):
+            mock_logger = MagicMock()
+            mock_get_logger.return_value = mock_logger
+
+            with pytest.raises(Exception, match="Failed to get page content"):
+                await URLBuilder.discover_available_seasons("football", "england-premier-league", mock_page)
+
+            # Should log the content retrieval error
+            mock_logger.error.assert_called()
+
+
+class TestDiscoverAvailableMarkets:
+    """Test the discover_available_markets method."""
+
+    @pytest.mark.asyncio
+    async def test_discover_markets_success_aussie_rules(self):
+        """Test successful market discovery for Aussie Rules with typical market tabs."""
+        from unittest.mock import AsyncMock, MagicMock
+
+        mock_page = AsyncMock()
+        mock_page.goto = AsyncMock()
+        mock_page.wait_for_timeout = AsyncMock()
+
+        # Mock market elements found on page
+        mock_market_element = AsyncMock()
+        mock_market_element.inner_text = AsyncMock(return_value="Home/Away")
+
+        mock_hidden_element = AsyncMock()
+        mock_hidden_element.inner_text = AsyncMock(return_value="Over/Under")
+
+        # Set up query_selector_all to return different results for different selectors
+        async def mock_query_selector_all(selector):
+            if "odds-item" in selector:
+                return [mock_market_element]
+            elif "snap-right" in selector:
+                return [mock_hidden_element]
+            else:
+                return []
+
+        mock_page.query_selector_all = AsyncMock(side_effect=mock_query_selector_all)
+
+        markets = await URLBuilder.discover_available_markets("aussie-rules", mock_page)
+
+        expected_markets = {
+            "home_away": "Home/Away",
+            "over_under": "Over/Under",
+            # Common fallback markets should also be included
+            "1x2": "1X2",
+            "handicap": "Handicap",
+            "margin": "Winning Margin",
+            "first_goalscorer": "First Goalscorer",
+        }
+
+        assert len(markets) >= 6  # At least the main markets plus fallbacks
+        assert "home_away" in markets
+        assert "over_under" in markets
+        assert markets["home_away"] == "Home/Away"
+        assert markets["over_under"] == "Over/Under"
+
+    @pytest.mark.asyncio
+    async def test_discover_markets_with_various_market_types(self):
+        """Test market discovery with various market types and formats."""
+        from unittest.mock import AsyncMock
+
+        mock_page = AsyncMock()
+        mock_page.goto = AsyncMock()
+        mock_page.wait_for_timeout = AsyncMock()
+
+        # Create mock elements for different market types
+        market_texts = [
+            "1X2", "Home/Away", "Over/Under", "Asian Handicap",
+            "Draw No Bet", "Double Chance", "Both Teams to Score"
+        ]
+
+        mock_elements = []
+        for text in market_texts:
+            mock_element = AsyncMock()
+            mock_element.inner_text = AsyncMock(return_value=text)
+            mock_elements.append(mock_element)
+
+        mock_page.query_selector_all = AsyncMock(return_value=mock_elements)
+
+        markets = await URLBuilder.discover_available_markets("football", mock_page)
+
+        expected_normalized = {
+            "1x2": "1X2",
+            "home_away": "Home/Away",
+            "over_under": "Over/Under",
+            "handicap": "Asian Handicap",
+            "draw_no_bet": "Draw No Bet",
+            "double_chance": "Double Chance",
+            "both_teams_to_score": "Both Teams to Score"
+        }
+
+        for normalized, display in expected_normalized.items():
+            assert normalized in markets
+            assert markets[normalized] == display
+
+    @pytest.mark.asyncio
+    async def test_discover_markets_no_sample_match(self):
+        """Test market discovery when no sample match URL is found."""
+        from unittest.mock import AsyncMock, patch
+
+        mock_page = AsyncMock()
+        mock_page.goto = AsyncMock()
+        mock_page.wait_for_timeout = AsyncMock()
+        mock_page.query_selector_all = AsyncMock(return_value=[])  # No matches found
+
+        markets = await URLBuilder.discover_available_markets("football", mock_page)
+
+        # Should return common markets as fallback
+        expected_common_markets = [
+            "1x2", "home_away", "over_under", "handicap", "draw_no_bet",
+            "double_chance", "correct_score", "half_time_full_time", "odd_even",
+            "both_teams_to_score"
+        ]
+
+        for market in expected_common_markets:
+            assert market in markets
+
+    @pytest.mark.asyncio
+    async def test_discover_markets_exception_handling(self):
+        """Test market discovery exception handling."""
+        from unittest.mock import AsyncMock, patch
+
+        mock_page = AsyncMock()
+        mock_page.goto = AsyncMock(side_effect=Exception("Network error"))
+
+        with patch('src.core.url_builder.logging.getLogger') as mock_get_logger:
+            mock_logger = MagicMock()
+            mock_get_logger.return_value = mock_logger
+
+            markets = await URLBuilder.discover_available_markets("football", mock_page)
+
+            # Should return empty dict on error
+            assert markets == {}
+            mock_logger.error.assert_called()
+
+    def test_normalize_market_name(self):
+        """Test market name normalization."""
+        test_cases = [
+            ("Home/Away", "home_away"),
+            ("Over/Under", "over_under"),
+            ("Asian Handicap", "handicap"),
+            ("Draw No Bet", "draw_no_bet"),
+            ("Double Chance", "double_chance"),
+            ("1X2", "1x2"),
+            ("Both Teams to Score", "both_teams_to_score"),
+            ("Odd or Even", "odd_even"),
+            ("Correct Score", "correct_score"),
+            ("Half Time/Full Time", "half_time_full_time"),
+        ]
+
+        for input_name, expected in test_cases:
+            result = URLBuilder._normalize_market_name(input_name)
+            assert result == expected, f"Expected '{expected}' for '{input_name}', got '{result}'"
+
+    def test_get_common_markets_for_sport(self):
+        """Test getting common markets for different sports."""
+        # Test football-specific markets
+        football_markets = URLBuilder._get_common_markets_for_sport("football")
+        assert "goalscorer" in football_markets
+        assert "cards" in football_markets
+        assert "corners" in football_markets
+
+        # Test basketball-specific markets
+        basketball_markets = URLBuilder._get_common_markets_for_sport("basketball")
+        assert "points" in basketball_markets
+        assert "rebounds" in basketball_markets
+        assert "assists" in basketball_markets
+
+        # Test tennis-specific markets
+        tennis_markets = URLBuilder._get_common_markets_for_sport("tennis")
+        assert "set_winner" in tennis_markets
+        assert "game_winner" in tennis_markets
+        assert "total_games" in tennis_markets
+
+        # Test aussie-rules specific markets
+        aussie_markets = URLBuilder._get_common_markets_for_sport("aussie-rules")
+        assert "margin" in aussie_markets
+        assert "first_goalscorer" in aussie_markets
+
+        # All should have common markets
+        for sport in ["football", "basketball", "tennis", "aussie-rules"]:
+            markets = URLBuilder._get_common_markets_for_sport(sport)
+            assert "1x2" in markets
+            assert "home_away" in markets
+            assert "over_under" in markets
+
+    @pytest.mark.asyncio
+    async def test_find_sample_match_url_with_discovered_leagues(self):
+        """Test finding sample match URL using discovered leagues."""
+        from unittest.mock import AsyncMock
+
+        mock_page = AsyncMock()
+        mock_page.goto = AsyncMock()
+        mock_page.wait_for_timeout = AsyncMock()
+
+        # Mock match link found on league page
+        mock_match_element = AsyncMock()
+        mock_match_element.get_attribute = AsyncMock(return_value="/football/match/example-match-123")
+
+        mock_page.query_selector_all = AsyncMock(return_value=[mock_match_element])
+
+        discovered_leagues = {
+            "football": {
+                "premier-league": f"{ODDSPORTAL_BASE_URL}/football/england/premier-league"
+            }
+        }
+
+        url = await URLBuilder._find_sample_match_url("football", mock_page, discovered_leagues)
+
+        expected_url = f"{ODDSPORTAL_BASE_URL}/football/match/example-match-123"
+        assert url == expected_url
+
+    @pytest.mark.asyncio
+    async def test_find_sample_match_url_no_matches_fallback(self):
+        """Test finding sample match URL with fallback when no matches found."""
+        from unittest.mock import AsyncMock
+
+        mock_page = AsyncMock()
+        mock_page.goto = AsyncMock()
+        mock_page.wait_for_timeout = AsyncMock()
+        mock_page.query_selector_all = AsyncMock(return_value=[])  # No matches found
+
+        url = await URLBuilder._find_sample_match_url("football", mock_page)
+
+        # Should return fallback URL
+        expected_url = f"{ODDSPORTAL_BASE_URL}/football/results/"
+        assert url == expected_url
+
+    @pytest.mark.asyncio
+    async def test_extract_markets_from_page(self):
+        """Test extracting markets from a loaded match page."""
+        from unittest.mock import AsyncMock
+
+        mock_page = AsyncMock()
+
+        # Mock multiple market elements with different selectors
+        market_elements = []
+        market_texts = ["1X2", "Home/Away", "Over/Under 2.5", "Asian Handicap -1.5"]
+
+        for text in market_texts:
+            mock_element = AsyncMock()
+            mock_element.inner_text = AsyncMock(return_value=text)
+            market_elements.append(mock_element)
+
+        # Simulate different selectors finding different markets
+        async def mock_query_selector_all(selector):
+            if "odds-item" in selector:
+                return market_elements[:2]  # 1X2, Home/Away
+            elif "snap-right" in selector:
+                return market_elements[2:]  # Over/Under, Asian Handicap
+            else:
+                return []
+
+        mock_page.query_selector_all = AsyncMock(side_effect=mock_query_selector_all)
+
+        markets = await URLBuilder._extract_markets_from_page(mock_page, "football")
+
+        # Check that markets were normalized correctly
+        assert "1x2" in markets
+        assert "home_away" in markets
+        assert "over_under25" in markets  # "Over/Under 2.5" becomes "over_under25"
+        assert "handicap15" in markets   # "Asian Handicap -1.5" becomes "handicap15"
+
+        assert markets["1x2"] == "1X2"
+        assert markets["home_away"] == "Home/Away"
+        assert markets["over_under25"] == "Over/Under 2.5"
+        assert markets["handicap15"] == "Asian Handicap -1.5"

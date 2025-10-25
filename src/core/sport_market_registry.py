@@ -1,4 +1,4 @@
-from typing import ClassVar
+from typing import ClassVar, Dict, Optional, Any
 
 from src.utils.sport_market_constants import (
     AmericanFootballMarket,
@@ -49,6 +49,7 @@ class SportMarketRegistry:
     """Registry to dynamically store market mappings for each sport."""
 
     _registry: ClassVar[dict] = {}
+    _discovered_markets: ClassVar[Dict[str, Dict[str, str]]] = {}
 
     @classmethod
     def register(cls, sport: Sport, market_mapping: dict):
@@ -58,9 +59,49 @@ class SportMarketRegistry:
         cls._registry[sport.value].update(market_mapping)
 
     @classmethod
+    def register_discovered_markets(cls, sport: str, markets: Dict[str, str]):
+        """Register auto-discovered markets for a sport."""
+        cls._discovered_markets[sport] = markets
+
+    @classmethod
     def get_market_mapping(cls, sport: str) -> dict:
-        """Retrieve market mappings for a given sport."""
+        """Retrieve market mappings for a given sport.
+
+        First checks for auto-discovered markets, then falls back to static registry.
+        """
+        # First check if we have auto-discovered markets
+        if sport in cls._discovered_markets:
+            # Combine discovered markets with static ones (static takes precedence)
+            discovered = cls._discovered_markets[sport].copy()
+            static = cls._registry.get(sport, {})
+            # Merge, with static markets taking precedence
+            discovered.update(static)
+            return discovered
+
+        # Fallback to static registry
         return cls._registry.get(sport, {})
+
+    @classmethod
+    def has_discovered_markets(cls, sport: str) -> bool:
+        """Check if auto-discovered markets are available for a sport."""
+        return sport in cls._discovered_markets
+
+    @classmethod
+    def get_discovered_markets(cls, sport: str) -> Dict[str, str]:
+        """Get only the auto-discovered markets for a sport."""
+        return cls._discovered_markets.get(sport, {})
+
+    @classmethod
+    def clear_discovered_markets(cls, sport: Optional[str] = None):
+        """Clear discovered markets cache.
+
+        Args:
+            sport: If provided, only clear markets for this sport. If None, clear all.
+        """
+        if sport:
+            cls._discovered_markets.pop(sport, None)
+        else:
+            cls._discovered_markets.clear()
 
 
 class SportMarketRegistrar:
