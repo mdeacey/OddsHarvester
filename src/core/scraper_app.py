@@ -722,27 +722,25 @@ async def _scrape_historic_date_range(scraper, sport: str, league: str, from_dat
     Returns:
         List of combined results from all seasons
     """
-    # Check if this is --all functionality (no specific date range)
-    is_all_mode = from_date is None and to_date is None
-
-    if is_all_mode:
-        logger.info(f"Auto-discovering exact available seasons for {sport}/{league}")
+    # Always use auto-discovery when league is "all" - standard date range doesn't make sense for unknown leagues
+    if league == "all":
+        logger.info(f"Auto-discovering exact available seasons for {sports}/all leagues")
         try:
-            # Try to auto-discover exact seasons
+            # Auto-discover exact seasons for all leagues
             discovered_seasons = await URLBuilder.discover_available_seasons(
-                sport, league, scraper.page, discovered_leagues
+                sports, league, scraper.page, discovered_leagues
             )
 
             # Generate URLs for discovered seasons (no wasted requests)
-            urls_with_seasons = URLBuilder.get_urls_for_specific_seasons(sport, league, discovered_seasons, discovered_leagues)
+            urls_with_seasons = URLBuilder.get_urls_for_specific_seasons(sports, league, discovered_seasons, discovered_leagues)
         except Exception as e:
-            logger.error(f"Season auto-discovery failed for {sport}/{league}: {e}")
-            # No fallback - if discovery fails on a valid league, there's a real problem
+            logger.error(f"Season auto-discovery failed for {sports}/{league}: {e}")
+            # No fallback - if discovery fails, there's a real problem with auto-discovery
             raise
     else:
-        # Use specified date range
+        # For specific leagues, use standard date range
         try:
-            urls_with_seasons = URLBuilder.get_historic_matches_urls_for_range(sport, from_date, to_date, league, discovered_leagues or {})
+            urls_with_seasons = URLBuilder.get_historic_matches_urls_for_range(sports, from_date, to_date, league, discovered_leagues or {})
         except ValueError as e:
             logger.error(f"Error generating URLs for season range: {e}")
             raise
