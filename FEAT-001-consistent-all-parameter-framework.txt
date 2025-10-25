@@ -1,0 +1,113 @@
+# FEAT-001: Implement Consistent --all Parameter Framework Across CLI
+
+## Problem:
+The current --all flag only applies to sports selection and creates confusing behavior where --all overrides --sport instead of working with it. Users expect consistent "all" behavior across all parameters but the current implementation is limited and counterintuitive. Additionally, the --sport parameter is grammatically inconsistent with --leagues (plural) and --markets (plural).
+
+## Solution:
+Replace --sport with --sports (plural for consistency) and implement a consistent --all parameter framework where each major parameter (--sports, --leagues, --markets) supports an explicit "all" value, providing intuitive behavior and eliminating parameter conflicts. No backward compatibility needed - this is a breaking change to fix the inconsistent API.
+
+## Stories:
+
+As a CLI user, I want to use --sports all instead of --all so that the parameter behavior is consistent with other parameters and grammatically correct.
+
+As a CLI user, I want to use --leagues all to explicitly request all leagues for a sport so that my intent is clear and explicit.
+
+As a CLI user, I want to be able to combine parameters like --sports aussie-rules --leagues all --markets all so that I have fine-grained control over what gets scraped.
+
+As a developer maintaining the codebase, I want consistent parameter handling logic and naming so that the code is easier to understand and maintain.
+
+## Current State:
+
+--all flag only works for sports selection and completely ignores --sport parameter (src/core/scraper_app.py:117-134):
+
+Current --all behavior:
+- Overrides any --sport parameter provided
+- Only applies to sports (all 23 supported sports)
+- Does not affect leagues, markets, or other parameters
+- Creates parameter conflicts that confuse users
+
+Inconsistent parameter naming:
+- --sport (singular) vs --leagues (plural) vs --markets (plural)
+- Grammatically inconsistent and confusing for users
+
+Parameter defaults when omitted:
+- Leagues: Auto-discovery of all leagues for sport (src/core/scraper_app.py:147-160)
+- Markets: All available markets (src/core/market_extraction/)
+- Pages: All pages (max_pages=None)
+
+## Available Data & Components:
+
+Sport enum (src/utils/sport_market_constants.py):
+- 23 supported sports including aussie-rules, football, tennis, etc.
+- Already supports list(Sport) for all sports
+
+Auto-discovery system (src/core/url_builder.py):
+- Dynamic league discovery already implemented
+- get_all_available_seasons_url_range() method for comprehensive coverage
+
+Market extraction system (src/core/market_extraction/):
+- SubmarketExtractor for all available markets
+- Market registry system for sport-specific markets
+
+CLI Argument Parser (src/cli/cli_argument_parser.py):
+- Existing --all flag implementation (lines 49-52, 69-72)
+- Parameter validation system in CLIArgumentValidator
+
+## Implementation:
+
+- Replace --sport parameter with --sports (breaking change)
+- Add support for "all" as a valid value for --sports, --leagues, and --markets parameters
+- Update argument parser to accept "all" as a choice for --sports and remove old --sport parameter
+- Update validation logic to handle "all" values appropriately and validate --sports parameter
+- Modify scraper app logic to process "all" values instead of separate --all flag
+- Remove --all flag completely (breaking change)
+- Update all references to use --sports instead of --sport throughout codebase (58 occurrences in tests alone, plus 29 in source code)
+- Update help text and documentation to reflect new parameter behavior
+- Add comprehensive tests for new parameter combinations
+- Update integration tests that use --sport parameter (13 occurrences affected)
+
+## Files to Modify:
+
+src/cli/cli_argument_parser.py - Replace --sport with --sports, add "all" choice, remove --all flag
+src/cli/cli_argument_validator.py - Update validation for --sports parameter and "all" values
+src/cli/cli_help_message_generator.py - Update help messages to show new --sports syntax
+src/cli/cli_argument_handler.py - Update argument handling for --sports parameter
+src/core/scraper_app.py - Replace --all flag logic with --sports == "all" logic, update all --sport references (lines 117-134 for historic, 193-209 for upcoming)
+src/main.py - Update --sport argument references to --sports
+README.md - Update all examples to use new --sports all syntax (46 occurrences of --sport, 20 occurrences of --all)
+tests/cli/test_cli_argument_parser.py - Update tests for new --sports parameter and remove --all flag tests (58 occurrences of --sport)
+tests/cli/test_cli_validation_integration.py - Update validation tests for --sports parameter
+tests/cli/test_cli_argument_handler.py - Update tests for --sports parameter
+tests/cli/test_cli_argument_validator.py - Update validation tests for --sports parameter (contains --sport references)
+tests/core/test_scraper_app.py - Update tests to use new --sports parameter syntax
+tests/integration/test_duplicate_detection_integration.py - Update integration tests (13 occurrences of --sport)
+
+## Dependencies:
+- No new dependencies required
+- Leverage existing Sport enum and auto-discovery systems
+- Utilize existing parameter validation framework
+- Build on current dynamic league discovery infrastructure
+
+## Estimated timebox:
+~17 hours (2 hours argument parser updates + 4 hours scraper logic changes + 8 hours tests + 3 hours documentation)
+
+Note: Updates are extensive due to:
+- 58 occurrences of --sport in test files
+- 13 occurrences of --sport in integration tests
+- 158 occurrences of --all in tests that need removal
+- 119 sport references in scraper app
+- 46 occurrences of --sport and 20 occurrences of --all in README.md
+- 17 occurrences of --all in source code that need removal
+
+## Acceptance Criteria:
+- --sports all works identically to current --all flag behavior
+- --leagues all explicitly triggers auto-discovery of all leagues for the specified sport
+- --markets all scrapes all available markets (maintains current default behavior)
+- --all flag completely removed from codebase
+- --sport parameter completely removed from codebase and replaced with --sports
+- New parameter combinations work: --sports aussie-rules --leagues all --markets 1x2
+- Documentation updated with new examples and reflects breaking changes
+- All tests pass with new syntax only
+- Help text clearly shows new parameter choices and behavior
+- Parameter naming is now consistent: --sports, --leagues, --markets (all plural)
+- No backward compatibility maintained (breaking change)

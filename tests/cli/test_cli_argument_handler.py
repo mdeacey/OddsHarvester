@@ -13,7 +13,7 @@ def cli_handler():
 def test_parse_and_validate_args_valid(cli_handler):
     mock_args = [
         "scrape",
-        "--sport",
+        "--sports",
         "football",
         "--date",
         "2024-02-25",
@@ -42,7 +42,7 @@ def test_parse_and_validate_args_valid(cli_handler):
     ):
         mock_parse_args.return_value = MagicMock(
             command="scrape",
-            sport="football",
+            sports="football",
             from_date="20240225",
             to_date=None,
             leagues=["england-premier-league"],
@@ -60,14 +60,13 @@ def test_parse_and_validate_args_valid(cli_handler):
             scrape_odds_history=False,
             target_bookmaker=None,
             preview_submarkets_only=False,
-            all=False,
         )
 
         parsed_args = cli_handler.parse_and_validate_args()
 
         assert parsed_args == {
             "command": "scrape",
-            "sport": "football",
+            "sports": "football",
             "from_date": "20240225",
             "to_date": None,
             "leagues": ["england-premier-league"],
@@ -85,8 +84,7 @@ def test_parse_and_validate_args_valid(cli_handler):
             "scrape_odds_history": False,
             "target_bookmaker": None,
             "preview_submarkets_only": False,
-            "all": False,
-            "change_sensitivity": "normal",
+                        "change_sensitivity": "normal",
         }
 
         mock_validate_args.assert_called_once_with(mock_parse_args.return_value)
@@ -103,8 +101,7 @@ def test_parse_and_validate_args_missing_command(cli_handler):
             "parse_args",
             return_value=MagicMock(
                 command=None,  # Simulate missing command
-                sport=None,
-                from_date=None,
+                                from_date=None,
                 to_date=None,
                 leagues=None,
                 storage="local",
@@ -122,7 +119,7 @@ def test_parse_and_validate_args_missing_command(cli_handler):
 
 def test_parse_and_validate_args_invalid_args(cli_handler):
     with (
-        patch("sys.argv", ["cli_tool.py", "scrape", "--sport", "invalid-sport"]),
+        patch("sys.argv", ["cli_tool.py", "scrape", "--sports", "invalid-sport"]),
         patch.object(cli_handler.parser, "parse_args") as mock_parse_args,
         patch.object(cli_handler.validator, "validate_args") as mock_validate_args,
         patch("builtins.exit") as mock_exit,
@@ -163,11 +160,10 @@ def test_parse_and_validate_args_with_all_flag(cli_handler):
     ):
         mock_parse_args.return_value = MagicMock(
             command="scrape_upcoming",
-            all=True,
+            sports="all",
             from_date="20240225",
             to_date=None,
-            sport=None,
-            leagues=None,
+                        leagues=None,
             markets=["1x2"],
             file_path=None,
             max_pages=None,
@@ -203,7 +199,7 @@ class TestAllFlagValidationFailureScenarios:
         mock_args = [
             "scrape_historic",
             "--all",
-            "--sport", "invalid_sport",
+            "--sports", "invalid_sport",
             "--from", "2023",
         ]
 
@@ -216,8 +212,8 @@ class TestAllFlagValidationFailureScenarios:
         ):
             mock_parse_args.return_value = MagicMock(
                 command="scrape_historic",
-                all=True,
-                sport="invalid_sport",  # Invalid sport
+                sports="all",
+                  # Invalid sport
                 from_date="2023",
                 to_date=None,
                 leagues=None,
@@ -269,7 +265,7 @@ class TestAllFlagValidationFailureScenarios:
         ):
             mock_parse_args.return_value = MagicMock(
                 command="scrape_historic",
-                all=True,
+                sports="all",
                 sport=None,  # Should be bypassed
                 from_date="2023",
                 to_date=None,
@@ -321,7 +317,7 @@ class TestAllFlagValidationFailureScenarios:
         ):
             mock_parse_args.return_value = MagicMock(
                 command="scrape_historic",
-                all=True,
+                sports="all",
                 sport=None,  # Triggers bypass
                 from_date="2023",
                 to_date=None,
@@ -371,7 +367,7 @@ class TestAllFlagValidationFailureScenarios:
         ):
             mock_parse_args.return_value = MagicMock(
                 command="scrape_historic",
-                all=True,
+                sports="all",
                 sport=None,  # Should be bypassed
                 from_date="invalid_date",  # Invalid
                 to_date=None,

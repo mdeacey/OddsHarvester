@@ -1,6 +1,6 @@
 """
 Comprehensive CLI validation integration tests.
-Tests the complete CLI validation pipeline with conditional --all flag logic.
+Tests the complete CLI validation pipeline with conditional --sports all parameter logic.
 """
 import argparse
 from datetime import datetime, timedelta
@@ -32,14 +32,13 @@ def handler():
 
 
 class TestAllFlagConditionalValidation:
-    """Test --all flag conditional validation scenarios."""
+    """Test --sports all parameter conditional validation scenarios."""
 
     def test_scrape_historic_all_without_sport_success(self, validator):
         """Test that scrape_historic --all without --sport bypasses sport validation."""
         mock_args = MagicMock(
             command="scrape_historic",
-            all=True,
-            sport=None,
+            sports="all",
             markets=None,
             leagues=None,
             from_date="2023",
@@ -61,14 +60,13 @@ class TestAllFlagConditionalValidation:
         try:
             validator.validate_args(mock_args)
         except ValueError as e:
-            pytest.fail(f"Unexpected ValueError when using --all flag without sport: {e}")
+            pytest.fail(f"Unexpected ValueError when using --sports all parameter without sport: {e}")
 
     def test_scrape_upcoming_all_without_sport_success(self, validator):
         """Test that scrape_upcoming --all without --sport bypasses sport validation."""
         mock_args = MagicMock(
             command="scrape_upcoming",
-            all=True,
-            sport=None,
+            sports="all",
             markets=None,
             leagues=None,
             from_date="now",
@@ -89,14 +87,14 @@ class TestAllFlagConditionalValidation:
         try:
             validator.validate_args(mock_args)
         except ValueError as e:
-            pytest.fail(f"Unexpected ValueError when using --all flag without sport: {e}")
+            pytest.fail(f"Unexpected ValueError when using --sports all parameter without sport: {e}")
 
     def test_scrape_historic_all_with_sport_validates_normally(self, validator):
         """Test that scrape_historic --all with --sport still validates sport normally."""
         mock_args = MagicMock(
             command="scrape_historic",
             all=True,
-            sport="invalid_sport",  # Invalid sport
+            sports="invalid_sport",  # Invalid sport
             markets=None,
             leagues=None,
             from_date="2023",
@@ -113,7 +111,7 @@ class TestAllFlagConditionalValidation:
         mock_args = MagicMock(
             command="scrape_upcoming",
             all=True,
-            sport="invalid_sport",  # Invalid sport
+            sports="invalid_sport",  # Invalid sport
             markets=None,
             leagues=None,
             from_date="20231201",
@@ -126,11 +124,10 @@ class TestAllFlagConditionalValidation:
             validator.validate_args(mock_args)
 
     def test_scrape_historic_all_with_invalid_markets_bypasses_validation(self, validator):
-        """Test that --all flag bypasses markets validation even with invalid markets."""
+        """Test that --sports all parameter bypasses markets validation even with invalid markets."""
         mock_args = MagicMock(
             command="scrape_historic",
-            all=True,
-            sport=None,
+            sports="all",
             markets=["invalid_market"],  # Normally would cause error
             leagues=None,
             from_date="2023",
@@ -152,14 +149,13 @@ class TestAllFlagConditionalValidation:
         try:
             validator.validate_args(mock_args)
         except ValueError as e:
-            pytest.fail(f"Unexpected ValueError when using --all flag with invalid markets: {e}")
+            pytest.fail(f"Unexpected ValueError when using --sports all parameter with invalid markets: {e}")
 
     def test_scrape_historic_all_with_invalid_leagues_bypasses_validation(self, validator):
-        """Test that --all flag bypasses leagues validation even with invalid leagues."""
+        """Test that --sports all parameter bypasses leagues validation even with invalid leagues."""
         mock_args = MagicMock(
             command="scrape_historic",
-            all=True,
-            sport=None,
+            sports="all",
             markets=None,
             leagues=["invalid_league"],  # Normally would cause error
             from_date="2023",
@@ -181,14 +177,13 @@ class TestAllFlagConditionalValidation:
         try:
             validator.validate_args(mock_args)
         except ValueError as e:
-            pytest.fail(f"Unexpected ValueError when using --all flag with invalid leagues: {e}")
+            pytest.fail(f"Unexpected ValueError when using --sports all parameter with invalid leagues: {e}")
 
     def test_no_all_flag_validates_sport_normally(self, validator):
-        """Test that without --all flag, sport validation works normally."""
+        """Test that without --sports all parameter, sport validation works normally."""
         mock_args = MagicMock(
             command="scrape_historic",
-            all=False,
-            sport=None,  # Missing sport should cause error when --all is False
+            sports="football",
             markets=None,
             leagues=None,
             from_date="2023",
@@ -201,11 +196,10 @@ class TestAllFlagConditionalValidation:
             validator.validate_args(mock_args)
 
     def test_all_flag_false_validates_sport_normally(self, validator):
-        """Test that when --all flag is explicitly False, sport validation works normally."""
+        """Test that when --sports all parameter is explicitly False, sport validation works normally."""
         mock_args = MagicMock(
             command="scrape_historic",
-            all=False,
-            sport=None,  # Missing sport should cause error when --all is False
+            sports="football",
             markets=None,
             leagues=None,
             from_date="2023",
@@ -235,7 +229,7 @@ class TestCLIIntegrationPipeline:
 
         # Verify parsed arguments
         assert args.command == "scrape_historic"
-        assert args.all is True
+        assert args.sports == "all"
         assert args.from_date == "2023"
         assert args.to_date == "2024"
 
@@ -253,7 +247,7 @@ class TestCLIIntegrationPipeline:
 
         # Verify parsed arguments
         assert args.command == "scrape_upcoming"
-        assert args.all is True
+        assert args.sports == "all"
         assert args.from_date == "now"
         assert args.to_date == "now"
 
@@ -269,7 +263,7 @@ class TestCLIIntegrationPipeline:
 
     @patch('sys.argv', ['scrape_historic', '--sport', 'football', '--from', '2023'])
     def test_scrape_historic_normal_validation_integration(self, parser, validator):
-        """Test normal validation flow without --all flag."""
+        """Test normal validation flow without --sports all parameter."""
         # Parse arguments
         args = parser.parse_args(['scrape_historic', '--sport', 'football', '--from', '2023'])
 
@@ -281,13 +275,13 @@ class TestCLIIntegrationPipeline:
 
         # Verify parsed arguments
         assert args.command == "scrape_historic"
-        assert args.all is False
+        assert args.sports != "all"
         assert args.sport == "football"
         assert args.from_date == "2023"
 
     @patch('sys.argv', ['scrape_historic', '--from', '2023'])
     def test_scrape_historic_missing_sport_without_all_integration(self, parser, validator):
-        """Test that missing sport without --all flag raises validation error."""
+        """Test that missing sport without --sports all parameter raises validation error."""
         # Parse arguments
         args = parser.parse_args(['scrape_historic', '--from', '2023'])
 
@@ -300,11 +294,10 @@ class TestErrorChainValidation:
     """Test error reporting chain validation."""
 
     def test_multiple_errors_without_all_flag(self, validator):
-        """Test that multiple validation errors are reported together without --all flag."""
+        """Test that multiple validation errors are reported together without --sports all parameter."""
         mock_args = MagicMock(
             command="scrape_historic",
-            all=False,
-            sport="invalid_sport",  # Invalid sport
+            sports="invalid_sport",  # Invalid sport
             markets=["invalid_market"],  # Invalid market
             leagues=["invalid_league"],  # Invalid league
             from_date="2023",
@@ -322,11 +315,10 @@ class TestErrorChainValidation:
         # Note: markets and leagues validation may be skipped if sport validation fails first
 
     def test_no_errors_with_all_flag(self, validator):
-        """Test that --all flag prevents validation errors even with invalid inputs."""
+        """Test that --sports all parameter prevents validation errors even with invalid inputs."""
         mock_args = MagicMock(
             command="scrape_historic",
-            all=True,
-            sport=None,
+            sports="all",
             markets=["invalid_market"],  # Would normally cause error
             leagues=["invalid_league"],  # Would normally cause error
             from_date="2023",
@@ -348,24 +340,23 @@ class TestErrorChainValidation:
         try:
             validator.validate_args(mock_args)
         except ValueError as e:
-            pytest.fail(f"Unexpected errors with --all flag: {e}")
+            pytest.fail(f"Unexpected errors with --sports all parameter: {e}")
 
 
 class TestEdgeCasesAndComplexScenarios:
     """Test edge cases and complex flag combinations."""
 
     def test_all_flag_with_match_links(self, validator):
-        """Test --all flag behavior with match_links (match_links should still require sport)."""
+        """Test --sports all parameter behavior with match_links (match_links should still require sport)."""
         mock_args = MagicMock(
             command="scrape_historic",
-            all=True,
-            sport=None,
+            sports="all",
             match_links=["https://www.oddsportal.com/football/test-match"],
             from_date="2023",
             to_date="2024"
         )
 
-        # match_links validation should still require sport even with --all flag
+        # match_links validation should still require sport even with --sports all parameter
         with pytest.raises(ValueError, match="--sport.*required.*match_links"):
             validator.validate_args(mock_args)
 
@@ -373,8 +364,7 @@ class TestEdgeCasesAndComplexScenarios:
         """Test that --all with leagues still requires sport validation."""
         mock_args = MagicMock(
             command="scrape_historic",
-            all=True,
-            sport=None,  # Sport is None
+            sports="all",  # Sport is None
             leagues=["england-premier-league"],  # But leagues are provided
             from_date="2023",
             to_date="2024",
@@ -391,19 +381,18 @@ class TestEdgeCasesAndComplexScenarios:
             storage="local"
         )
 
-        # With --all flag, sport validation should be bypassed even when leagues are provided
+        # With --sports all parameter, sport validation should be bypassed even when leagues are provided
         try:
             validator.validate_args(mock_args)
         except ValueError as e:
-            pytest.fail(f"Unexpected validation error with --all flag and leagues: {e}")
+            pytest.fail(f"Unexpected validation error with --sports all parameter and leagues: {e}")
 
     def test_boolean_variations_all_flag(self, validator):
-        """Test different boolean variations of --all flag."""
-        # Test all=False
+        """Test different boolean variations of --sports all parameter."""
+        # Test specific sport (not all)
         mock_args_false = MagicMock(
             command="scrape_historic",
-            all=False,
-            sport=None,  # Missing sport
+            sports="football",
             from_date="2023",
             to_date="2024",
             match_links=None,
@@ -426,7 +415,7 @@ class TestEdgeCasesAndComplexScenarios:
         mock_args_none = MagicMock(
             command="scrape_historic",
             all=None,
-            sport=None,  # Missing sport
+            sports=None,  # Missing sport
             from_date="2023",
             to_date="2024",
             match_links=None,
@@ -448,8 +437,7 @@ class TestEdgeCasesAndComplexScenarios:
         # Test all=True (bypasses validation)
         mock_args_true = MagicMock(
             command="scrape_historic",
-            all=True,
-            sport=None,  # Missing sport but bypassed
+            sports="all",  # Missing sport but bypassed
             from_date="2023",
             to_date="2024",
             match_links=None,
@@ -471,16 +459,15 @@ class TestEdgeCasesAndComplexScenarios:
             pytest.fail(f"Unexpected error with all=True: {e}")
 
     def test_all_flag_date_validation_still_required(self, validator):
-        """Test that date validation is still required with --all flag."""
+        """Test that date validation is still required with --sports all parameter."""
         mock_args = MagicMock(
             command="scrape_historic",
-            all=True,
-            sport=None,
+            sports="all",
             from_date=None,  # Missing dates
             to_date=None
         )
 
-        # Date validation should still work normally with --all flag
+        # Date validation should still work normally with --sports all parameter
         # This should pass since dates can be optional and default to "now"
         try:
             validator.validate_args(mock_args)
@@ -489,23 +476,22 @@ class TestEdgeCasesAndComplexScenarios:
             pass
 
     def test_all_flag_with_storage_validation(self, validator):
-        """Test that storage validation still works with --all flag."""
+        """Test that storage validation still works with --sports all parameter."""
         mock_args = MagicMock(
             command="scrape_historic",
-            all=True,
-            sport=None,
+            sports="all",
             from_date="2023",
             to_date="2024",
             storage="invalid_storage"  # Invalid storage
         )
 
-        # Storage validation should still work even with --all flag
+        # Storage validation should still work even with --sports all parameter
         with pytest.raises(ValueError, match="Invalid storage type"):
             validator.validate_args(mock_args)
 
 
 class TestRealWorldUsagePatterns:
-    """Test real-world CLI usage patterns with --all flag."""
+    """Test real-world CLI usage patterns with --sports all parameter."""
 
     @patch('sys.argv', ['scrape_historic', '--all', '--from', '2022', '--to', '2023', '--max_pages', '10'])
     def test_historic_all_with_pages(self, parser, validator):
@@ -515,7 +501,7 @@ class TestRealWorldUsagePatterns:
             validator.validate_args(args)
         except ValueError as e:
             pytest.fail(f"Failed historic --all with max_pages: {e}")
-        assert args.all is True
+        assert args.sports == "all"
         assert args.max_pages == 10
 
     @patch('sys.argv', ['scrape_upcoming', '--all', '--from', 'now'])
@@ -526,7 +512,7 @@ class TestRealWorldUsagePatterns:
             validator.validate_args(args)
         except ValueError as e:
             pytest.fail(f"Failed upcoming --all from now: {e}")
-        assert args.all is True
+        assert args.sports == "all"
         assert args.from_date == "now"
 
     @patch('sys.argv', ['scrape_historic', '--all', '--from', '2023-2024'])
@@ -537,7 +523,7 @@ class TestRealWorldUsagePatterns:
             validator.validate_args(args)
         except ValueError as e:
             pytest.fail(f"Failed historic --all with season range: {e}")
-        assert args.all is True
+        assert args.sports == "all"
         assert args.from_date == "2023-2024"
 
     @patch('sys.argv', ['scrape_upcoming', '--all', '--from', 'now', '--to', 'now', '--format', 'json'])
@@ -548,7 +534,7 @@ class TestRealWorldUsagePatterns:
             validator.validate_args(args)
         except ValueError as e:
             pytest.fail(f"Failed upcoming --all with format: {e}")
-        assert args.all is True
+        assert args.sports == "all"
         assert args.format == "json"
 
 

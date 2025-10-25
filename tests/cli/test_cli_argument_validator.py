@@ -16,7 +16,7 @@ def validator():
 def mock_args():
     return MagicMock(
         command="scrape_upcoming",
-        sport="football",
+        sports="football",
         leagues=["england-premier-league"],
         from_date=(datetime.now() + timedelta(days=1)).strftime("%Y%m%d"),  # Corrected format (YYYYMMDD)
         to_date=None,
@@ -35,8 +35,7 @@ def mock_args():
         odds_format="Decimal Odds",
         concurrency_tasks=3,
         max_pages=None,  # Add max_pages to avoid mock issues
-        all=False,  # Add all flag to avoid mock issues
-    )
+            )
 
 
 def test_validate_args_valid(validator, mock_args):
@@ -684,7 +683,7 @@ class TestAllFlagConditionalValidation:
         """Test that --all flag with valid sport still validates normally."""
         args = self._create_test_args(
             all=True,
-            sport="football",  # Valid sport
+            sports="football",  # Valid sport
             markets=["1x2"],
             leagues=["england-premier-league"]
         )
@@ -782,7 +781,7 @@ class TestAllFlagConditionalValidation:
         # Case 2: all=True and sport="football" -> should NOT bypass
         args_no_bypass = self._create_test_args(
             all=True,
-            sport="football",
+            sports="football",
             markets=["1x2"],
             leagues=["england-premier-league"]
         )

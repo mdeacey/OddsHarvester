@@ -33,7 +33,7 @@ def main():
             run_scraper(
                 command=args["command"],
                 match_links=args["match_links"],
-                sport=args["sport"],
+                sports=args["sports"],
                 from_date=args["from_date"],
                 to_date=args["to_date"],
                 leagues=args["leagues"],
@@ -47,7 +47,6 @@ def main():
                 scrape_odds_history=args["scrape_odds_history"],
                 headless=args["headless"],
                 preview_submarkets_only=args["preview_submarkets_only"],
-                all=args["all"],
                 change_sensitivity=args.get("change_sensitivity", "normal"),
             )
         )

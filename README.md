@@ -39,7 +39,7 @@ OddsHarvester is an application designed to scrape and process sports betting od
   - **Performance Metrics**: Detailed logging of scraping efficiency and change distribution
   - **Preview Mode**: Faster scraping with average odds only
   - **Concurrent Processing**: Configurable concurrent tasks for improved performance
-  - **Bulk Operations**: `--all` flag to scrape all sports in a single command
+  - **Bulk Operations**: `--sportss all` parameter to scrape all sports in a single command
 - **🎯 Market Variety**: Support for dozens to hundreds of specific betting markets per sport.
 - **☁️ Cloud Ready**: Serverless Framework integration for AWS Lambda deployment with automated scheduling.
 
@@ -189,7 +189,7 @@ By following these steps, you should have **OddsHarvester** set up and ready to 
 - **4385% Increase in Coverage**: Now discovers 1,500+ leagues vs. 392 previously hardcoded
 - **Real-Time Detection**: Automatically finds new leagues as they appear on oddsportal.com
 - **Zero Maintenance**: No more manual updates when leagues change or are added
-- **Enhanced --all Functionality**: Scrapes all discovered leagues across all sports automatically
+- **Enhanced --sportss all Functionality**: Scrapes all discovered leagues across all sports automatically
 - **Intelligent Season Discovery**: Automatically detects all available seasons for historical scraping
 
 ### **⚡ Exact Season Discovery Optimization (OPT-003)**
@@ -219,11 +219,11 @@ Retrieve odds and event details for upcoming sports matches.
 
 | 🏷️ Option                   | 📝 Description                                                                                                        | 🔐 Required                                         | 🔧 Default     |
 | --------------------------- | --------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------- | -------------- |
-| `--sport`                   | Specify the sport to scrape (e.g., `football`, `ice-hockey`, `baseball`).                                             | ✅                                                  | None           |
+| `--sportss`                  | Specify the sport(s) to scrape. Use `all` for all 23 supported sports, or specify a sport (e.g., `football`, `ice-hockey`, `baseball`). | ✅                                                  | None           |
 | `--from`                    | Start date for matches in flexible format: `YYYYMMDD`, `YYYYMM`, `YYYY`, or `now` (e.g., `20250101`, `202501`, `2025`, `now`). Optional when using `--leagues` or defaults to `now`. | ✅ (unless `--match_links` or `--leagues` provided) | None           |
 | `--to`                      | End date for matches in flexible format: `YYYYMMDD`, `YYYYMM`, `YYYY`, or `now`. If not provided, defaults to `--from` date for single dates, or unlimited range for date ranges. | ❌                                                  | None           |
-| `--leagues`                 | Comma-separated leagues to scrape (e.g., `england-premier-league,spain-laliga`).                                      | ❌                                                  | None           |
-| `--markets`                 | Comma-separated betting markets (e.g., `1x2,btts`).                                                                   | ❌                                                  | None           |
+| `--leagues`                 | Comma-separated leagues to scrape, or `all` for all leagues (e.g., `england-premier-league,spain-laliga`).           | ❌                                                  | None           |
+| `--markets`                 | Comma-separated betting markets, or `all` for all markets (e.g., `1x2,btts`).                                        | ❌                                                  | None           |
 | `--storage`                 | Save data locally or to a remote S3 bucket (`local` or `remote`).                                                     | ❌                                                  | `local`        |
 | `--file_path`               | File path to save data locally (e.g., `output.json`).                                                                 | ❌                                                  | None           |
 | `--format`                  | Format for saving local data (`json` or `csv`).                                                                       | ❌                                                  | None           |
@@ -239,7 +239,6 @@ Retrieve odds and event details for upcoming sports matches.
 | `--concurrency_tasks`       | Number of concurrent tasks for scraping.                                                                              | ❌                                                  | `3`            |
 | `--preview_submarkets_only` | Only scrape average odds from visible submarkets without loading individual bookmaker details (faster, limited data). | ❌                                                  | `False`        |
 | `--change_sensitivity`      | Duplicate detection sensitivity level: `aggressive` (skip >95% unchanged odds), `normal` (skip 100% unchanged odds), `conservative` (always scrape known matches). | ❌                                                  | `normal`       |
-| `--all`                     | Scrape all 23 supported sports with a single command. Works with single dates or date ranges specified with --from/--to. | ❌                                                  | `False`        |
 
 #### **📌 Important Notes:**
 
@@ -253,9 +252,9 @@ Retrieve odds and event details for upcoming sports matches.
 - **Historical Date Auto-Swapping**: For historical matches, dates are automatically swapped if in wrong order (e.g., `--from now --to 2023` becomes `--from 2023 --to now`).
 - **League Priority**: If both `--leagues` and `--from/--to` are provided, the scraper **prioritizes the leagues** and bypasses date validation, scraping all available matches for those leagues.
 - **Dynamic League Validation**: Leagues are validated dynamically during scraping. Invalid leagues will be gracefully skipped with warnings rather than causing errors.
-- **Match Links Override**: If `--match_links` is provided, it overrides `--sport`, `--from/--to`, and `--leagues`, and only the specified match links will be scraped.
+- **Match Links Override**: If `--match_links` is provided, it overrides `--sportss`, `--from/--to`, and `--leagues`, and only the specified match links will be scraped.
 - **Single Sport Requirement**: All match links must belong to the same sport when using `--match_links`.
-- **`--all` Flag**: The `--all` flag scrapes all 23 supported sports with dynamic league discovery for single dates or date ranges. This discovers and scrapes all available leagues for each sport, providing comprehensive coverage.
+- **`--sportss all` Parameter**: The `--sportss all` parameter scrapes all 23 supported sports with dynamic league discovery for single dates or date ranges. This discovers and scrapes all available leagues for each sport, providing comprehensive coverage.
 - **Proxy Configuration**: For best results, ensure the proxy's region matches the `BROWSER_LOCALE_TIMEZONE` and `BROWSER_TIMEZONE_ID` settings.
 - **Odds History Included**: The system now automatically includes odds movement history (hover-over modal data) by default, providing complete odds evolution timeline for each bookmaker.
 
@@ -263,35 +262,35 @@ Retrieve odds and event details for upcoming sports matches.
 
 - **Retrieve upcoming football matches for January 1, 2025, and save results locally:**
 
-`uv run python src/main.py scrape_upcoming --sport football --markets 1x2 --from 20250101 --headless`
+`uv run python src/main.py scrape_upcoming --sports football --markets 1x2 --from 20250101 --headless`
 
 - **Scrapes English Premier League matches with odds for 1x2 and Both Teams to Score (BTTS):**
 
-`uv run python src/main.py scrape_upcoming --sport football --leagues england-premier-league --markets 1x2,btts --storage local --headless`
+`uv run python src/main.py scrape_upcoming --sports football --leagues england-premier-league --markets 1x2,btts --storage local --headless`
 
 - **Scrapes multiple leagues at once:**
 
-`uv run python src/main.py scrape_upcoming --sport football --leagues england-premier-league,spain-laliga,italy-serie-a --markets 1x2,btts --storage local --headless`
+`uv run python src/main.py scrape_upcoming --sports football --leagues england-premier-league,spain-laliga,italy-serie-a --markets 1x2,btts --storage local --headless`
 
 - **Scrapes baseball matches using a rotating proxy setup:**
 
-`uv run python src/main.py scrape_upcoming --sport baseball --from 20250227 --markets home_away --proxies "http://proxy1.com:8080 user1 pass1" "http://proxy2.com:8080 user2 pass2" --headless`
+`uv run python src/main.py scrape_upcoming --sports baseball --from 20250227 --markets home_away --proxies "http://proxy1.com:8080 user1 pass1" "http://proxy2.com:8080 user2 pass2" --headless`
 
 - **Scrapes football matches in preview mode (average odds only, faster):**
 
-`uv run python src/main.py scrape_upcoming --sport football --from 20250101 --markets over_under_2_5 --preview_submarkets_only --headless`
+`uv run python src/main.py scrape_upcoming --sports football --from 20250101 --markets over_under_2_5 --preview_submarkets_only --headless`
 
 - **Scrapes all 23 supported sports for current date only (with dynamic discovery):**
 
-`uv run python src/main.py scrape_upcoming --all --from now --headless`
+`uv run python src/main.py scrape_upcoming --sports all --from now --headless`
 
 - **Scrapes all 23 supported sports for a specific date only (discovers all available leagues):**
 
-`uv run python src/main.py scrape_upcoming --all --from 20250101 --headless`
+`uv run python src/main.py scrape_upcoming --sports all --from 20250101 --headless`
 
 - **Dynamic league discovery example - discovers all available football leagues:**
 
-`uv run python src/main.py scrape_upcoming --sport football --from 20250101 --markets 1x2 --headless`
+`uv run python src/main.py scrape_upcoming --sports football --from 20250101 --markets 1x2 --headless`
 
 #### **🔄 Duplicate Detection (Default Behavior)**
 
@@ -315,13 +314,13 @@ OddsHarvester automatically uses intelligent duplicate detection to avoid re-scr
 
 ```bash
 # Normal sensitivity (default) - balanced approach
-uv run python src/main.py scrape_upcoming --sport football --from 20250101 --headless
+uv run python src/main.py scrape_upcoming --sports football --from 20250101 --headless
 
 # Aggressive sensitivity - maximum performance for frequent scraping
-uv run python src/main.py scrape_upcoming --sport football --from 20250101 --headless --change_sensitivity aggressive
+uv run python src/main.py scrape_upcoming --sports football --from 20250101 --headless --change_sensitivity aggressive
 
 # Conservative sensitivity - maximum data accuracy
-uv run python src/main.py scrape_upcoming --sport football --from 20250101 --headless --change_sensitivity conservative
+uv run python src/main.py scrape_upcoming --sports football --from 20250101 --headless --change_sensitivity conservative
 ```
 
 **What Gets Detected:**
@@ -332,45 +331,45 @@ uv run python src/main.py scrape_upcoming --sport football --from 20250101 --hea
 
 - **Scrapes a date range for a single sport:**
 
-`uv run python src/main.py scrape_upcoming --sport football --from 20250101 --to 20250107 --markets 1x2 --headless`
+`uv run python src/main.py scrape_upcoming --sports football --from 20250101 --to 20250107 --markets 1x2 --headless`
 
 - **Scrapes all sports for a date range:**
 
-`uv run python src/main.py scrape_upcoming --all --from 20250101 --to 20250107 --headless`
+`uv run python src/main.py scrape_upcoming --sports all --from 20250101 --to 20250107 --headless`
 
 - **Scrapes all sports with limited markets for faster execution:**
 
-`uv run python src/main.py scrape_upcoming --all --markets 1x2,home_away --preview_submarkets_only --headless`
+`uv run python src/main.py scrape_upcoming --sports all --markets 1x2,home_away --preview_submarkets_only --headless`
 
 - **Different date granularities for single dates:**
 
-`uv run python src/main.py scrape_upcoming --sport football --from 20250101  # Full date`
-`uv run python src/main.py scrape_upcoming --sport football --from 202501     # Entire month`
-`uv run python src/main.py scrape_upcoming --sport football --from 2025       # Entire year`
+`uv run python src/main.py scrape_upcoming --sports football --from 20250101  # Full date`
+`uv run python src/main.py scrape_upcoming --sports football --from 202501     # Entire month`
+`uv run python src/main.py scrape_upcoming --sports football --from 2025       # Entire year`
 
 - **Date range for single sport (same granularity):**
 
-`uv run python src/main.py scrape_upcoming --sport football --from 20250101 --to 20250107  # Date range`
-`uv run python src/main.py scrape_upcoming --sport football --from 202501 --to 202503      # Month range`
-`uv run python src/main.py scrape_upcoming --sport football --from 2024 --to 2025          # Year range`
+`uv run python src/main.py scrape_upcoming --sports football --from 20250101 --to 20250107  # Date range`
+`uv run python src/main.py scrape_upcoming --sports football --from 202501 --to 202503      # Month range`
+`uv run python src/main.py scrape_upcoming --sports football --from 2024 --to 2025          # Year range`
 
 - **Flexible date defaults and unlimited ranges:**
 
-`uv run python src/main.py scrape_upcoming --sport football --from now          # From today to unlimited future`
-`uv run python src/main.py scrape_upcoming --sport football --to now            # From unlimited past to today`
-`uv run python src/main.py scrape_upcoming --sport football --from 20250101     # From specific date to unlimited future`
-`uv run python src/main.py scrape_upcoming --sport football                        # Defaults to now with unlimited future`
+`uv run python src/main.py scrape_upcoming --sports football --from now          # From today to unlimited future`
+`uv run python src/main.py scrape_upcoming --sports football --to now            # From unlimited past to today`
+`uv run python src/main.py scrape_upcoming --sports football --from 20250101     # From specific date to unlimited future`
+`uv run python src/main.py scrape_upcoming --sports football                        # Defaults to now with unlimited future`
 
 - **League-focused scraping (dates bypassed):**
 
-`uv run python src/main.py scrape_upcoming --sport football --leagues england-premier-league --markets 1x2  # All Premier League matches, dates ignored`
-`uv run python src/main.py scrape_upcoming --sport football --leagues england-premier-league,spain-laliga --from 20250101  # Leagues prioritized, dates optional`
+`uv run python src/main.py scrape_upcoming --sports football --leagues england-premier-league --markets 1x2  # All Premier League matches, dates ignored`
+`uv run python src/main.py scrape_upcoming --sports football --leagues england-premier-league,spain-laliga --from 20250101  # Leagues prioritized, dates optional`
 
 - **Large date ranges (no limits):**
 
-`uv run python src/main.py scrape_upcoming --sport football --from 20240101 --to 20251231     # Full year range`
-`uv run python src/main.py scrape_upcoming --sport football --from 20200101 --to 20251231     # 5-year range for comprehensive data collection`
-`uv run python src/main.py scrape_historic --sport football --leagues england-premier-league --from 2000 --to 2024  # 24-year historical range`
+`uv run python src/main.py scrape_upcoming --sports football --from 20240101 --to 20251231     # Full year range`
+`uv run python src/main.py scrape_upcoming --sports football --from 20200101 --to 20251231     # 5-year range for comprehensive data collection`
+`uv run python src/main.py scrape_historic --sports football --leagues england-premier-league --from 2000 --to 2024  # 24-year historical range`
 
 #### **2. Scrape Historical Odds**
 
@@ -380,11 +379,11 @@ Retrieve historical odds and results for analytical purposes.
 
 | 🏷️ Option                   | 📝 Description                                                                                                        | 🔐 Required | 🔧 Default     |
 | --------------------------- | --------------------------------------------------------------------------------------------------------------------- | ----------- | -------------- |
-| `--sport`                   | Specify the sport to scrape (e.g., `football`, `ice-hockey`, `baseball`).                                             | ✅          | None           |
-| `--leagues`                 | Comma-separated leagues to scrape (e.g., `england-premier-league,spain-laliga`).                                      | ✅          | None           |
+| `--sports`                   | Specify the sport(s) to scrape. Use `all` for all 23 supported sports, or specify a sport (e.g., `football`, `ice-hockey`, `baseball`). | ✅          | None           |
+| `--leagues`                 | Comma-separated leagues to scrape, or `all` for all leagues (e.g., `england-premier-league,spain-laliga`).              | ✅          | None           |
 | `--from`                    | Start season/year in `YYYY`, `YYYY-YYYY` format, or `now` for current year (e.g., `2023`, `2022-2023`, `now`). Optional with `--leagues` or defaults to unlimited past. | ✅          | None           |
 | `--to`                      | End season/year in `YYYY`, `YYYY-YYYY` format, or `now` for current year. If not provided, defaults to `--from` season or unlimited past. | ❌          | None           |
-| `--markets`                 | Comma-separated betting markets (e.g., `1x2,btts`).                                                                   | ❌          | None           |
+| `--markets`                 | Comma-separated betting markets, or `all` for all markets (e.g., `1x2,btts`).                                        | ❌          | None           |
 | `--storage`                 | Save data locally or to a remote S3 bucket (`local` or `remote`).                                                     | ❌          | `local`        |
 | `--file_path`               | File path to save data locally (e.g., `output.json`).                                                                 | ❌          | None           |
 | `--format`                  | Format for saving local data (`json` or `csv`).                                                                       | ❌          | None           |
@@ -401,91 +400,90 @@ Retrieve historical odds and results for analytical purposes.
 | `--concurrency_tasks`       | Number of concurrent tasks for scraping.                                                                              | ❌          | `3`            |
 | `--preview_submarkets_only` | Only scrape average odds from visible submarkets without loading individual bookmaker details (faster, limited data). | ❌          | `False`        |
 | `--change_sensitivity`      | Duplicate detection sensitivity level: `aggressive`, `normal`, `conservative`.                                              | ❌          | `normal`       |
-| `--all`                     | Scrape all 23 supported sports with a single command for the specified season range.                                  | ❌          | `False`        |
 
 
 #### **Example Usage:**
 
 - **Retrieve historical odds for the Premier League's 2022-2023 season:**
 
-`uv run python src/main.py scrape_historic --sport football --leagues england-premier-league --from 2022-2023 --markets 1x2 --headless`
+`uv run python src/main.py scrape_historic --sports football --leagues england-premier-league --from 2022-2023 --markets 1x2 --headless`
 
 - **Retrieve historical odds for multiple leagues at once:**
 
-`uv run python src/main.py scrape_historic --sport football --leagues england-premier-league,spain-laliga,italy-serie-a --from 2022-2023 --markets 1x2 --headless`
+`uv run python src/main.py scrape_historic --sports football --leagues england-premier-league,spain-laliga,italy-serie-a --from 2022-2023 --markets 1x2 --headless`
 
 - **Retrieve historical odds for the current season of Premier League:**
 
-`uv run python src/main.py scrape_historic --sport football --leagues england-premier-league --from now --markets 1x2 --headless`
+`uv run python src/main.py scrape_historic --sports football --leagues england-premier-league --from now --markets 1x2 --headless`
 
 - **Retrieve historical MLB 2022 season data:**
 
-`uv run python src/main.py scrape_historic --sport baseball --leagues mlb --from 2022 --markets home_away --headless`
+`uv run python src/main.py scrape_historic --sports baseball --leagues mlb --from 2022 --markets home_away --headless`
 
 - **Scrapes only 3 pages of historical odds data:**
 
-`uv run python src/main.py scrape_historic --sport football --leagues england-premier-league --from 2022-2023 --markets 1x2 --max_pages 3 --headless`
+`uv run python src/main.py scrape_historic --sports football --leagues england-premier-league --from 2022-2023 --markets 1x2 --max_pages 3 --headless`
 
 - **Scrapes historical odds in preview mode (average odds only, faster):**
 
-`uv run python src/main.py scrape_historic --sport football --leagues england-premier-league --from 2022-2023 --markets over_under_2_5 --preview_submarkets_only --headless`
+`uv run python src/main.py scrape_historic --sports football --leagues england-premier-league --from 2022-2023 --markets over_under_2_5 --preview_submarkets_only --headless`
 
 - **Scrapes historical odds for all 23 sports for the 2023 season (discovers all leagues dynamically):**
 
-`uv run python src/main.py scrape_historic --all --from 2023 --headless`
+`uv run python src/main.py scrape_historic --sports all --from 2023 --headless`
 
 - **Scrapes historical odds for all sports for 2022-2023 season with limited pages:**
 
-`uv run python src/main.py scrape_historic --all --from 2022-2023 --max_pages 5 --headless`
+`uv run python src/main.py scrape_historic --sports all --from 2022-2023 --max_pages 5 --headless`
 
 - **Scrapes all sports in preview mode for faster comprehensive data collection:**
 
-`uv run python src/main.py scrape_historic --all --from now --markets 1x2,home_away --preview_submarkets_only --headless`
+`uv run python src/main.py scrape_historic --sports all --from now --markets 1x2,home_away --preview_submarkets_only --headless`
 
 - **Single season (replaces --season parameter):**
 
-`uv run python src/main.py scrape_historic --sport football --leagues england-premier-league --from 2023 --to 2023`
-`uv run python src/main.py scrape_historic --sport football --leagues england-premier-league --from 2022-2023 --to 2022-2023  # Replaces 2022-2023 season format`
+`uv run python src/main.py scrape_historic --sports football --leagues england-premier-league --from 2023 --to 2023`
+`uv run python src/main.py scrape_historic --sports football --leagues england-premier-league --from 2022-2023 --to 2022-2023  # Replaces 2022-2023 season format`
 
 - **Multi-season range for single sport:**
 
-`uv run python src/main.py scrape_historic --sport football --leagues england-premier-league --from 2021 --to 2023`
+`uv run python src/main.py scrape_historic --sports football --leagues england-premier-league --from 2021 --to 2023`
 
 - **All sports for single season:**
 
-`uv run python src/main.py scrape_historic --all --from 2023 --to 2023`
+`uv run python src/main.py scrape_historic --sports all --from 2023 --to 2023`
 
 - **All sports for multi-season range:**
 
-`uv run python src/main.py scrape_historic --all --from 2021 --to 2023`
+`uv run python src/main.py scrape_historic --sports all --from 2021 --to 2023`
 
 - **Using 'now' keyword for historical matches:**
 
-`uv run python src/main.py scrape_historic --sport football --leagues england-premier-league --from 2023 --to now  # From specific season to current`
-`uv run python src/main.py scrape_historic --sport football --leagues england-premier-league --from now --to 2023  # From current season back to 2023 (auto-swapped)`
-`uv run python src/main.py scrape_historic --all --from now --to now  # Current season only`
+`uv run python src/main.py scrape_historic --sports football --leagues england-premier-league --from 2023 --to now  # From specific season to current`
+`uv run python src/main.py scrape_historic --sports football --leagues england-premier-league --from now --to 2023  # From current season back to 2023 (auto-swapped)`
+`uv run python src/main.py scrape_historic --sports all --from now --to now  # Current season only`
 
 - **Unlimited historical data collection (no year limits):**
 
-`uv run python src/main.py scrape_historic --sport football --leagues england-premier-league --from 1990 --to 2024  # 34-year complete history`
-`uv run python src/main.py scrape_historic --all --from 2000 --to 2024  # 24-year data for all sports`
-`uv run python src/main.py scrape_historic --sport basketball --leagues nba --from 1980  # From 1980 to present (unlimited)`
+`uv run python src/main.py scrape_historic --sports football --leagues england-premier-league --from 1990 --to 2024  # 34-year complete history`
+`uv run python src/main.py scrape_historic --sports all --from 2000 --to 2024  # 24-year data for all sports`
+`uv run python src/main.py scrape_historic --sports basketball --leagues nba --from 1980  # From 1980 to present (unlimited)`
 
 - **Exact Seasons Optimization Examples:**
 
-`uv run python src/main.py scrape_historic --all --from now  # Discovers exact seasons for each league (Africa Cup: 2008,2010,2012,2013,2015,2017,2019,2021,2023,2025)`
-`uv run python src/main.py scrape_historic --sport football --leagues africa-cup-of-nations --from now  # Only attempts 10 actual seasons vs 27 arbitrary years (63% improvement)`
+`uv run python src/main.py scrape_historic --sports all --from now  # Discovers exact seasons for each league (Africa Cup: 2008,2010,2012,2013,2015,2017,2019,2021,2023,2025)`
+`uv run python src/main.py scrape_historic --sports football --leagues africa-cup-of-nations --from now  # Only attempts 10 actual seasons vs 27 arbitrary years (63% improvement)`
 
-- **Enhanced Season Auto-Discovery**: For `--all` mode (no dates specified), automatically discovers all exact available seasons for each league, providing complete historical coverage without manual season specification.
+- **Enhanced Season Auto-Discovery**: For `--sports all` mode (no dates specified), automatically discovers all exact available seasons for each league, providing complete historical coverage without manual season specification.
 - **Exact Season Optimization**: Only attempts seasons that actually exist on league pages, eliminating 30-80% of failed requests for tournaments with irregular schedules.
 
 - **Flexible defaults for historical matches:**
 
-`uv run python src/main.py scrape_historic --sport football --leagues england-premier-league --from now          # Current season to unlimited past`
-`uv run python src/main.py scrape_historic --sport football --leagues england-premier-league --to now            # Unlimited past to current season`
-`uv run python src/main.py scrape_historic --sport football --leagues england-premier-league                      # Current season only (no dates needed)`
-`uv run python src/main.py scrape_historic --all --from 2023                                                     # 2023 season to current for all sports`
-`uv run python src/main.py scrape_historic --all --to 2023                                                       # Unlimited past to 2023 for all sports`
+`uv run python src/main.py scrape_historic --sports football --leagues england-premier-league --from now          # Current season to unlimited past`
+`uv run python src/main.py scrape_historic --sports football --leagues england-premier-league --to now            # Unlimited past to current season`
+`uv run python src/main.py scrape_historic --sports football --leagues england-premier-league                      # Current season only (no dates needed)`
+`uv run python src/main.py scrape_historic --sports all --from 2023                                                     # 2023 season to current for all sports`
+`uv run python src/main.py scrape_historic --sports all --to 2023                                                       # Unlimited past to 2023 for all sports`
 
 #### **📌 Preview Mode**
 
@@ -530,7 +528,7 @@ OddsHarvester is compatible with Docker, allowing you to run the application sea
    Start a Docker container based on the built image. Pass any CLI arguments (e.g., `scrape_upcoming`) as part of the Docker run command:
 
    ```bash
-   docker run --rm odds-harvester:local python3 -m src.main scrape_upcoming --sport football --date 20250903 --markets 1x2 --storage local --file_path output.json --headless
+   docker run --rm odds-harvester:local python3 -m src.main scrape_upcoming --sports football --from 20250903 --markets 1x2 --storage local --file_path output.json --headless
    ```
 
 4. **Interactive Mode for Debugging**

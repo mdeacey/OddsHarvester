@@ -34,7 +34,7 @@ class CLIArgumentHandler:
         return {
             "command": args.command,
             "match_links": getattr(args, "match_links", None),
-            "sport": getattr(args, "sport", None),
+            "sports": getattr(args, "sports", None),
             "from_date": getattr(args, "from_date", None),
             "to_date": getattr(args, "to_date", None),
             "leagues": getattr(args, "leagues", None),
@@ -51,6 +51,5 @@ class CLIArgumentHandler:
             "target_bookmaker": getattr(args, "target_bookmaker", None),
             "scrape_odds_history": getattr(args, "scrape_odds_history", True),
             "preview_submarkets_only": getattr(args, "preview_submarkets_only", False),
-            "all": getattr(args, "all", False),
             "change_sensitivity": getattr(args, "change_sensitivity", "normal") if hasattr(args, "change_sensitivity") and hasattr(getattr(args, "change_sensitivity", None), "__name__") else "normal",
         }

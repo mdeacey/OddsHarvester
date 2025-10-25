@@ -109,7 +109,7 @@ class TestDuplicateDetectionIntegration:
 
         with patch('sys.argv', [
             'python', 'scrape_upcoming',
-            '--sport', 'football',
+            '--sports', 'football',
             '--file_path', output_file,
             '--change_sensitivity', 'normal'
         ]):
@@ -136,7 +136,7 @@ class TestDuplicateDetectionIntegration:
 
         with patch('sys.argv', [
             'python', 'scrape_upcoming',
-            '--sport', 'football',
+            '--sports', 'football',
             '--file_path', output_file,
             '--change_sensitivity', 'normal'
         ]):
@@ -155,7 +155,7 @@ class TestDuplicateDetectionIntegration:
 
         with patch('sys.argv', [
             'python', 'scrape_upcoming',
-            '--sport', 'football',
+            '--sports', 'football',
             '--file_path', output_file,
             '--change_sensitivity', 'normal'
         ]):
@@ -179,7 +179,7 @@ class TestDuplicateDetectionIntegration:
 
         with patch('sys.argv', [
             'python', 'scrape_upcoming',
-            '--sport', 'football',
+            '--sports', 'football',
             '--file_path', output_file,
             '--change_sensitivity', 'normal'
         ]):
@@ -193,7 +193,7 @@ class TestDuplicateDetectionIntegration:
 
         with patch('sys.argv', [
             'python', 'scrape_upcoming',
-            '--sport', 'football',
+            '--sports', 'football',
             '--file_path', output_file,
             '--change_sensitivity', 'normal'
         ]):
@@ -218,7 +218,7 @@ class TestDuplicateDetectionIntegration:
 
         with patch('sys.argv', [
             'python', 'scrape_upcoming',
-            '--sport', 'football',
+            '--sports', 'football',
             '--file_path', output_file,
             '--change_sensitivity', 'aggressive'
         ]):
@@ -241,7 +241,7 @@ class TestDuplicateDetectionIntegration:
 
         with patch('sys.argv', [
             'python', 'scrape_upcoming',
-            '--sport', 'football',
+            '--sports', 'football',
             '--file_path', output_file,
             '--change_sensitivity', 'conservative'
         ]):
@@ -264,7 +264,7 @@ class TestDuplicateDetectionIntegration:
 
         with patch('sys.argv', [
             'python', 'scrape_upcoming',
-            '--sport', 'football',
+            '--sports', 'football',
             '--file_path', output_file,
             '--format', 'csv',
             '--change_sensitivity', 'normal'
@@ -289,7 +289,7 @@ class TestDuplicateDetectionIntegration:
 
         with patch('sys.argv', [
             'python', 'scrape_upcoming',
-            '--sport', 'football',
+            '--sports', 'football',
             '--file_path', output_file,
             '--change_sensitivity', 'aggressive'
         ]):
@@ -309,7 +309,7 @@ class TestDuplicateDetectionIntegration:
 
         with patch('sys.argv', [
             'python', 'scrape_upcoming',
-            '--sport', 'football',
+            '--sports', 'football',
             '--file_path', output_file,
             '--change_sensitivity', 'normal'
         ]):
@@ -333,7 +333,7 @@ class TestDuplicateDetectionIntegration:
 
         with patch('sys.argv', [
             'python', 'scrape_upcoming',
-            '--sport', 'football',
+            '--sports', 'football',
             '--file_path', output_file,
             '--change_sensitivity', 'normal'
         ]):
@@ -355,7 +355,7 @@ class TestDuplicateDetectionIntegration:
 
         with patch('sys.argv', [
             'python', 'scrape_upcoming',
-            '--sport', 'football',
+            '--sports', 'football',
             '--file_path', output_file,
             '--change_sensitivity', 'normal'
         ]):

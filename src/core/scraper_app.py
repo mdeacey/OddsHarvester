@@ -39,7 +39,7 @@ TRANSIENT_ERRORS = (
 async def run_scraper(
     command: CommandEnum,
     match_links: list | None = None,
-    sport: str | None = None,
+    sports: str | None = None,
     from_date: str | None = None,
     to_date: str | None = None,
     leagues: list[str] | None = None,
@@ -53,17 +53,16 @@ async def run_scraper(
     scrape_odds_history: bool = True,  # Always scrape odds history by default
     headless: bool = True,
     preview_submarkets_only: bool = False,
-    all: bool = False,
     change_sensitivity: str = "normal",
 ) -> dict:
     """Runs the scraping process and handles execution."""
     logger.info(
         f"Starting scraper with parameters: command={command}, match_links={match_links}, "
-        f"sport={sport}, from_date={from_date}, to_date={to_date}, leagues={leagues}, markets={markets}, "
+        f"sports={sports}, from_date={from_date}, to_date={to_date}, leagues={leagues}, markets={markets}, "
         f"max_pages={max_pages}, proxies={proxies}, browser_user_agent={browser_user_agent}, "
         f"browser_locale_timezone={browser_locale_timezone}, browser_timezone_id={browser_timezone_id}, "
         f"scrape_odds_history={scrape_odds_history}, target_bookmaker={target_bookmaker}, "
-        f"headless={headless}, preview_submarkets_only={preview_submarkets_only}, all={all}, "
+        f"headless={headless}, preview_submarkets_only={preview_submarkets_only}, "
         f"change_sensitivity={change_sensitivity}"
     )
 
@@ -90,15 +89,15 @@ async def run_scraper(
             proxy=proxy_config,
         )
 
-        if match_links and sport:
+        if match_links and sports:
             logger.info(f"""
-                Scraping specific matches: {match_links} for sport: {sport}, markets={markets},
+                Scraping specific matches: {match_links} for sport: {sports}, markets={markets},
                 scrape_odds_history={scrape_odds_history}, target_bookmaker={target_bookmaker}
             """)
             return await retry_scrape(
                 scraper.scrape_matches,
                 match_links=match_links,
-                sport=sport,
+                sport=sports,
                 markets=markets,
                 scrape_odds_history=scrape_odds_history,
                 target_bookmaker=target_bookmaker,
@@ -114,8 +113,8 @@ async def run_scraper(
             elif not from_date and to_date:
                 from_date = None  # No start limit - all historical going backwards
 
-            if all:
-                # When --all flag is used, scrape all sports for the provided season range
+            if sports == "all":
+                # When --sports all is used, scrape all sports for the provided season range
                 logger.info(
                     f"\n                Scraping historical odds for all 23 sports from {from_date} to {to_date}, "
                     f"markets={markets}, scrape_odds_history={scrape_odds_history}, "
@@ -134,12 +133,12 @@ async def run_scraper(
                 )
 
             # Regular historic scraping (single sport)
-            if not sport:
+            if not sports:
                 raise ValueError("Sport must be provided for historic scraping.")
 
             logger.info(
                 "\n                Scraping historical odds for "
-                f"sport={sport}, leagues={leagues}, from {from_date} to {to_date}, "
+                f"sport={sports}, leagues={leagues}, from {from_date} to {to_date}, "
                 f"markets={markets}, scrape_odds_history={scrape_odds_history}, "
                 f"target_bookmaker={target_bookmaker}, max_pages={max_pages}\n            "
             )
@@ -149,7 +148,7 @@ async def run_scraper(
                 return await _scrape_single_league_date_range(
                     scraper=scraper,
                     command=command,
-                    sport=sport,
+                    sport=sports,
                     league=None,  # This will trigger auto-discovery
                     from_date=from_date,
                     to_date=to_date,
@@ -162,7 +161,7 @@ async def run_scraper(
                 return await _scrape_single_league_date_range(
                     scraper=scraper,
                     command=command,
-                    sport=sport,
+                    sport=sports,
                     league=leagues[0],
                     from_date=from_date,
                     to_date=to_date,
@@ -176,7 +175,7 @@ async def run_scraper(
                     scraper=scraper,
                     command=command,
                     leagues=leagues,
-                    sport=sport,
+                    sport=sports,
                     from_date=from_date,
                     to_date=to_date,
                     markets=markets,
@@ -190,8 +189,8 @@ async def run_scraper(
             if not to_date:
                 to_date = from_date
 
-            if all:
-                # When --all flag is used, scrape all sports with provided date range
+            if sports == "all":
+                # When --sports all is used, scrape all sports with provided date range
                 logger.info(
                     f"\n                Scraping upcoming matches for all 23 sports from {from_date} to {to_date}, "
                     f"markets={markets}, scrape_odds_history={scrape_odds_history}, "
@@ -216,7 +215,7 @@ async def run_scraper(
 
             if leagues:
                 logger.info(f"""
-                    Scraping upcoming matches for sport={sport}, from {from_date} to {to_date}, leagues={leagues}, markets={markets},
+                    Scraping upcoming matches for sport={sports}, from {from_date} to {to_date}, leagues={leagues}, markets={markets},
                     scrape_odds_history={scrape_odds_history}, target_bookmaker={target_bookmaker}
                 """)
 
@@ -224,7 +223,7 @@ async def run_scraper(
                     return await _scrape_single_league_date_range(
                         scraper=scraper,
                         command=command,
-                        sport=sport,
+                        sport=sports,
                         league=leagues[0],
                         from_date=from_date,
                         to_date=to_date,
@@ -237,7 +236,7 @@ async def run_scraper(
                         scraper=scraper,
                         command=command,
                         leagues=leagues,
-                        sport=sport,
+                        sport=sports,
                         from_date=from_date,
                         to_date=to_date,
                         markets=markets,
@@ -246,13 +245,13 @@ async def run_scraper(
                     )
             else:
                 logger.info(f"""
-                    Scraping upcoming matches for sport={sport}, from {from_date} to {to_date}, markets={markets},
+                    Scraping upcoming matches for sport={sports}, from {from_date} to {to_date}, markets={markets},
                     scrape_odds_history={scrape_odds_history}, target_bookmaker={target_bookmaker}
                 """)
                 return await _scrape_single_sport_date_range(
                     scraper=scraper,
                     command=command,
-                    sport=sport,
+                    sport=sports,
                     from_date=from_date,
                     to_date=to_date,
                     markets=markets,

@@ -45,12 +45,7 @@ class CLIArgumentParser:
             "--to", type=str, dest="to_date",
             help="End date for upcoming matches (format: YYYYMMDD, YYYYMM, YYYY, or 'now'). If not provided, defaults to --from date."
         )
-        parser.add_argument(
-            "--all",
-            action="store_true",
-            help="� Scrape all 23 supported sports with a single command. Works with single dates or date ranges specified with --from/--to.",
-        )
-
+  
     def _add_historic_parser(self, subparsers):
         parser = subparsers.add_parser(
             "scrape_historic", help="Scrape historical odds for a specific league and/or season."
@@ -65,12 +60,7 @@ class CLIArgumentParser:
             help="� End season/year for historical matches (format: YYYY, YYYY-YYYY, or 'now'). If not provided, defaults to --from season."
         )
         parser.add_argument("--max_pages", type=int, help="� Maximum number of pages to scrape (optional).")
-        parser.add_argument(
-            "--all",
-            action="store_true",
-            help="� Scrape all 23 supported sports with a single command for the specified season range.",
-        )
-
+  
     def _add_common_arguments(self, parser):
         parser.add_argument(
             "--match_links",
@@ -80,24 +70,25 @@ class CLIArgumentParser:
             help="� Specific match links to scrape. Overrides sport, league, and date.",
         )
         parser.add_argument(
-            "--sport",
+            "--sports",
             type=str,
+            choices=["all"] + [sport.value for sport in Sport],
             help=(
-                "Specify the sport to scrape (e.g., football, tennis, basketball, rugby-league, "
-                "rugby-union, ice-hockey, baseball, american-football, aussie-rules, badminton, "
-                "bandy, boxing, cricket, darts, esports, floorball, futsal, handball, mma, "
-                "snooker, table-tennis, volleyball, water-polo)."
+                "Specify the sport(s) to scrape. Use 'all' to scrape all 23 supported sports, or specify a sport "
+                "(e.g., football, tennis, basketball, rugby-league, rugby-union, ice-hockey, baseball, "
+                "american-football, aussie-rules, badminton, bandy, boxing, cricket, darts, esports, floorball, "
+                "futsal, handball, mma, snooker, table-tennis, volleyball, water-polo)."
             ),
         )
         parser.add_argument(
             "--leagues",
             type=lambda s: s.split(","),
-            help="� Comma-separated list of leagues to scrape (e.g., premier-league,champions-league).",
+            help="� Comma-separated list of leagues to scrape, or 'all' for all leagues (e.g., premier-league,champions-league).",
         )
         parser.add_argument(
             "--markets",
             type=lambda s: s.split(","),
-            help="� Comma-separated list of markets to scrape (e.g., 1x2,btts).",
+            help="� Comma-separated list of markets to scrape, or 'all' for all markets (e.g., 1x2,btts).",
         )
         parser.add_argument(
             "--storage",

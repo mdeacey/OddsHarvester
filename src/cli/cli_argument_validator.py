@@ -27,25 +27,26 @@ class CLIArgumentValidator:
 
         errors = []
 
-        # Conditional validation: bypass sport/markets/leagues validation when --all flag is used without sport
-        should_bypass_validation = (
-            hasattr(args, "all") and args.all and
-            (not hasattr(args, "sport") or args.sport is None)
-        )
+        # Validate sports parameter
+        if hasattr(args, "sports"):
+            errors.extend(self._validate_sports(sports=args.sports))
+
+        # Determine actual sport(s) for other validations
+        sports = self._get_sports_from_args(args)
+
+        # Conditional validation: bypass sport/markets/leagues validation when --sports all is used
+        should_bypass_validation = sports == "all"
 
         if not should_bypass_validation:
-            if hasattr(args, "sport"):
-                errors.extend(self._validate_sport(sport=args.sport))
-
             if hasattr(args, "markets"):
-                errors.extend(self._validate_markets(sport=args.sport, markets=args.markets))
+                errors.extend(self._validate_markets(sport=sports, markets=args.markets))
 
             if hasattr(args, "leagues"):
-                errors.extend(self._validate_leagues(sport=args.sport, leagues=args.leagues))
+                errors.extend(self._validate_leagues(sport=sports, leagues=args.leagues))
 
         # Match links validation should happen after bypass logic
         if hasattr(args, "match_links"):
-            errors.extend(self._validate_match_links(match_links=args.match_links, sport=args.sport))
+            errors.extend(self._validate_match_links(match_links=args.match_links, sport=sports))
 
         if hasattr(args, "from_date") and hasattr(args, "to_date"):
             errors.extend(
@@ -55,7 +56,7 @@ class CLIArgumentValidator:
                     to_date=args.to_date,
                     match_links=args.match_links,
                     leagues=getattr(args, "leagues", None),
-                    all_flag=getattr(args, "all", False),
+                    sports=sports,
                 )
             )
 
@@ -104,7 +105,7 @@ class CLIArgumentValidator:
 
         if match_links:
             if not sport:
-                errors.append("The '--sport' argument is required when using '--match_links'.")
+                errors.append("The '--sports' argument is required when using '--match_links'.")
 
             for link in match_links:
                 if not url_pattern.match(link):
@@ -112,31 +113,48 @@ class CLIArgumentValidator:
 
         return errors
 
-    def _validate_sport(self, sport: str | None) -> list[str]:
-        """Validates the sport argument."""
+    def _validate_sports(self, sports: str | None) -> list[str]:
+        """Validates the sports argument."""
         errors = []
         supported_sports = ", ".join(s.value for s in Sport)
 
-        if not sport:
-            error_msg = f"Invalid sport: None. Expected one of {[s.value for s in Sport]}."
+        if not sports:
+            error_msg = f"Invalid sports: None. Expected 'all' or one of {[s.value for s in Sport]}."
             errors.append(error_msg)
             raise ValueError(error_msg)
 
+        if sports == "all":
+            return errors  # "all" is always valid
+
         try:
-            Sport(str(sport).lower())
+            Sport(str(sports).lower())
         except (ValueError, AttributeError):
-            if isinstance(sport, str):
-                error_msg = f"Invalid sport: '{sport}'. Supported sports are: {supported_sports}."
+            if isinstance(sports, str):
+                error_msg = f"Invalid sport: '{sports}'. Supported sports are: {supported_sports}, or 'all' for all sports."
             else:
-                error_msg = f"Invalid sport: {sport}. Expected one of {[s.value for s in Sport]}."
+                error_msg = f"Invalid sport: {sports}. Expected 'all' or one of {[s.value for s in Sport]}."
             errors.append(error_msg)
             raise ValueError(error_msg) from None
 
         return errors
 
-    def _validate_markets(self, sport: Sport, markets: list[str]) -> list[str]:
+    def _get_sports_from_args(self, args: argparse.Namespace) -> str | None:
+        """Extracts the sports value from args for processing."""
+        if hasattr(args, "sports"):
+            return args.sports
+        return None
+
+    def _validate_sport(self, sport: str | None) -> list[str]:
+        """Validates the sport argument (kept for backward compatibility)."""
+        return self._validate_sports(sport)
+
+    def _validate_markets(self, sport: str | Sport, markets: list[str]) -> list[str]:
         """Validates markets against the selected sport."""
         errors = []
+
+        # Skip market validation if sports is "all" or sport is None
+        if sport == "all" or sport is None:
+            return errors
 
         if isinstance(sport, str):
             try:
@@ -146,7 +164,7 @@ class CLIArgumentValidator:
 
         supported_markets = get_supported_markets(sport)
 
-        if markets:
+        if markets and "all" not in markets:
             for market in markets:
                 if market not in supported_markets:
                     errors.append(
@@ -167,6 +185,10 @@ class CLIArgumentValidator:
         if not leagues:
             return errors
 
+        # Skip league validation if sports is "all"
+        if sport == "all":
+            return errors
+
         try:
             Sport(sport.lower()) if isinstance(sport, str) else sport
         except ValueError:
@@ -177,13 +199,13 @@ class CLIArgumentValidator:
         return errors
 
     def _validate_date_range(
-        self, command: str, from_date: str | None, to_date: str | None, match_links: list[str] | None, leagues: list[str] | None = None, all_flag: bool = False
+        self, command: str, from_date: str | None, to_date: str | None, match_links: list[str] | None, leagues: list[str] | None = None, sports: str | None = None
     ) -> list[str]:
         """Validates the from/to date range arguments for both upcoming and historic commands."""
         errors = []
 
-        # Date range not required when match_links or leagues is provided, but is required for --all flag
-        if match_links or (leagues and not all_flag):
+        # Date range not required when match_links or leagues is provided, but is required for --sports all
+        if match_links or (leagues and sports != "all"):
             return errors
 
         if command == "scrape_upcoming":

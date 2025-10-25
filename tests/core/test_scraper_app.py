@@ -66,7 +66,7 @@ async def test_run_scraper_historic(
 
         result = await run_scraper(
             command=CommandEnum.HISTORIC,
-            sport="football",
+            sports="football",
             leagues=["england-premier-league"],
             from_date="2023",
             to_date="2023",
@@ -128,7 +128,7 @@ async def test_run_scraper_upcoming(
 
         result = await run_scraper(
             command=CommandEnum.UPCOMING_MATCHES,
-            sport="basketball",
+            sports="basketball",
             from_date="20230601",
             to_date="20230601",
             leagues=["nba"],
@@ -188,14 +188,14 @@ async def test_run_scraper_match_links(
     result = await run_scraper(
         command=CommandEnum.HISTORIC,  # Doesn't matter for this test
         match_links=match_links,
-        sport="tennis",
+        sports="tennis",
         markets=["1x2"],
         scrape_odds_history=True,
         target_bookmaker="bet365",
     )
 
     scraper_mock.scrape_matches.assert_called_once_with(
-        match_links=match_links, sport="tennis", markets=["1x2"], scrape_odds_history=True, target_bookmaker="bet365"
+        match_links=match_links, sports="tennis", markets=["1x2"], scrape_odds_history=True, target_bookmaker="bet365"
     )
 
     assert result == {"result": "match_data"}
@@ -257,7 +257,7 @@ async def test_run_scraper_error_handling(sport_market_registrar_mock, proxy_man
     proxy_manager_mock.return_value = proxy_manager_instance
 
     result = await run_scraper(
-        command=CommandEnum.HISTORIC, sport="football", leagues=["premier-league"], from_date="2023", to_date="2023"
+        command=CommandEnum.HISTORIC, sports="football", leagues=["premier-league"], from_date="2023", to_date="2023"
     )
 
     scraper_mock.stop_playwright.assert_called_once()
@@ -284,7 +284,7 @@ async def test_scrape_multiple_leagues_success():
             scraper=scraper_mock,
             scrape_func=scrape_func_mock,
             leagues=leagues,
-            sport="football",
+            sports="football",
             season="2023",
             markets=["1x2"],
         )
@@ -319,7 +319,7 @@ async def test_scrape_multiple_leagues_with_failures():
             scraper=scraper_mock,
             scrape_func=scrape_func_mock,
             leagues=leagues,
-            sport="football",
+            sports="football",
             season="2023",
         )
 
@@ -352,7 +352,7 @@ async def test_scrape_multiple_leagues_empty_results():
             scraper=scraper_mock,
             scrape_func=scrape_func_mock,
             leagues=leagues,
-            sport="football",
+            sports="football",
         )
 
     # Verify only non-empty results are included
@@ -381,7 +381,7 @@ async def test_run_scraper_multiple_leagues_historic():
 
         result = await run_scraper(
             command=CommandEnum.HISTORIC,
-            sport="football",
+            sports="football",
             leagues=["england-premier-league", "spain-laliga"],
             from_date="2023",
             to_date="2023",
@@ -548,7 +548,7 @@ async def test_run_scraper_upcoming_all_flag(
 
         result = await run_scraper(
             command=CommandEnum.UPCOMING_MATCHES,
-            all=True,
+            sports="all",
             from_date="20250225",
             to_date="20250225",
             markets=["1x2"],
@@ -606,7 +606,7 @@ async def test_run_scraper_historic_all_flag(
 
         result = await run_scraper(
             command=CommandEnum.HISTORIC,
-            all=True,
+            sports="all",
             from_date="2023-2024",
             to_date="2023-2024",
             markets=["1x2", "btts"],
@@ -698,7 +698,7 @@ async def test_scrape_multiple_leagues_date_range_success():
                 scraper=scraper_mock,
                 command=CommandEnum.UPCOMING_MATCHES,
                 leagues=["england-premier-league", "spain-laliga"],
-                sport="football",
+                sports="football",
                 from_date="20250101",
                 to_date="20250101",
                 markets=["1x2"],
@@ -739,7 +739,7 @@ async def test_scrape_multiple_leagues_date_range_with_failures():
                 scraper=scraper_mock,
                 command=CommandEnum.UPCOMING_MATCHES,
                 leagues=["england-premier-league", "spain-primera-division"],
-                sport="football",
+                sports="football",
                 from_date="20250101",
                 to_date="20250101",
                 markets=["1x2"],
@@ -771,7 +771,7 @@ async def test_run_scraper_date_range_single_sport():
 
         result = await run_scraper(
             command=CommandEnum.UPCOMING_MATCHES,
-            sport="football",
+            sports="football",
             from_date="20250101",
             to_date="20250107",
             markets=["1x2"],
@@ -809,7 +809,7 @@ async def test_run_scraper_with_now_keyword():
 
         result = await run_scraper(
             command=CommandEnum.UPCOMING_MATCHES,
-            sport="football",
+            sports="football",
             from_date="now",
             to_date=None,  # Should default to "now" (same as from_date) for single date
             markets=["1x2"],
@@ -848,7 +848,7 @@ async def test_run_scraper_historic_with_defaults():
         # Test with no from_date or to_date (should default to now and unlimited past)
         result = await run_scraper(
             command=CommandEnum.HISTORIC,
-            all=True,
+            sports="all",
             from_date=None,
             to_date=None,
             markets=["1x2"],
@@ -885,7 +885,7 @@ async def test_run_scraper_upcoming_with_leagues_no_date():
 
         result = await run_scraper(
             command=CommandEnum.UPCOMING_MATCHES,
-            sport="football",
+            sports="football",
             leagues=["premier-league", "spain-laliga"],
             from_date=None,
             to_date=None,
@@ -933,7 +933,7 @@ async def test_scrape_historic_all_leagues_success():
         with patch('src.core.scraper_app._scrape_historic_date_range', side_effect=mock_scrape_historic_date_range):
             result = await _scrape_historic_all_leagues(
                 scraper=scraper_mock,
-                sport="football",
+                sports="football",
                 from_date="2023",
                 to_date="2023"
             )
@@ -975,7 +975,7 @@ async def test_scrape_historic_all_leagues_with_failures():
         with patch('src.core.scraper_app._scrape_historic_date_range', side_effect=mock_scrape_historic_date_range_with_failures):
             result = await _scrape_historic_all_leagues(
                 scraper=scraper_mock,
-                sport="football",
+                sports="football",
                 from_date="2023",
                 to_date="2023"
             )
@@ -1022,7 +1022,7 @@ async def test_scrape_single_league_date_range_with_auto_discovery():
         result = await _scrape_single_league_date_range(
             scraper=scraper_mock,
             command=CommandEnum.HISTORIC,
-            sport="football",
+            sports="football",
             league=None,  # This should trigger auto-discovery
             from_date="2023",
             to_date="2023"
@@ -1062,7 +1062,7 @@ async def test_scrape_historic_date_range_all_functionality():
     with patch.object(URLBuilder, 'discover_available_seasons', side_effect=mock_discover_seasons):
         result = await _scrape_historic_date_range(
             scraper=scraper_mock,
-            sport="football",
+            sports="football",
             league="england-premier-league",
             from_date=None,  # --all mode
             to_date=None,    # --all mode
@@ -1103,7 +1103,7 @@ async def test_scrape_historic_date_range_all_functionality_fallback():
         with pytest.raises(ValueError, match="No seasons discovered on league page"):
             await _scrape_historic_date_range(
                 scraper=scraper_mock,
-                sport="football",
+                sports="football",
                 league="england-premier-league",
                 from_date=None,  # --all mode
                 to_date=None,    # --all mode
@@ -1140,7 +1140,7 @@ async def test_scrape_historic_date_range_africa_cup_optimization():
     with patch.object(URLBuilder, 'discover_available_seasons', side_effect=mock_discover_seasons_africa_cup):
         result = await _scrape_historic_date_range(
             scraper=scraper_mock,
-            sport="football",
+            sports="football",
             league="africa-cup-of-nations",
             from_date=None,  # --all mode
             to_date=None,    # --all mode
@@ -1176,7 +1176,7 @@ async def test_get_urls_for_specific_seasons_integration():
     # Test irregular seasons like World Cup
     world_cup_seasons = [2010, 2014, 2018, 2022]
     urls_with_seasons = URLBuilder.get_urls_for_specific_seasons(
-        sport="football",
+        sports="football",
         league="england-premier-league",  # Using a test league
         seasons=world_cup_seasons,
         discovered_leagues=discovered_leagues
