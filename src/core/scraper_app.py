@@ -148,7 +148,7 @@ async def run_scraper(
                 return await _scrape_single_league_date_range(
                     scraper=scraper,
                     command=command,
-                    sport=sports,
+                    sports=sports,
                     league=None,  # This will trigger auto-discovery
                     from_date=from_date,
                     to_date=to_date,
@@ -161,7 +161,7 @@ async def run_scraper(
                 return await _scrape_single_league_date_range(
                     scraper=scraper,
                     command=command,
-                    sport=sports,
+                    sports=sports,
                     league=leagues[0],
                     from_date=from_date,
                     to_date=to_date,
@@ -223,7 +223,7 @@ async def run_scraper(
                     return await _scrape_single_league_date_range(
                         scraper=scraper,
                         command=command,
-                        sport=sports,
+                        sports=sports,
                         league=leagues[0],
                         from_date=from_date,
                         to_date=to_date,
@@ -477,7 +477,7 @@ async def _scrape_multiple_leagues_date_range(scraper, command: CommandEnum, lea
             logger.info(f"[{i}/{len(leagues)}] Processing league: {league}")
 
             league_data = await _scrape_single_league_date_range(
-                scraper, command, sport, league, from_date, to_date, **kwargs
+                scraper, command, sports, league, from_date, to_date, **kwargs
             )
 
             if league_data:
