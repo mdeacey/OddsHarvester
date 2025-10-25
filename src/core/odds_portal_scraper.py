@@ -42,7 +42,7 @@ class OddsPortalScraper(BaseScraper):
 
     async def scrape_historic(
         self,
-        sport: str,
+        sports: str,
         league: str,
         season: str,
         markets: list[str] | None = None,
@@ -55,7 +55,7 @@ class OddsPortalScraper(BaseScraper):
         Scrapes historical odds data.
 
         Args:
-            sport (str): The sport to scrape.
+            sports (str): The sport to scrape.
             league (str): The league to scrape.
             season (str): The season to scrape.
             markets (Optional[List[str]]): List of markets.
@@ -70,8 +70,8 @@ class OddsPortalScraper(BaseScraper):
         if not current_page:
             raise RuntimeError("Playwright has not been initialized. Call `start_playwright()` first.")
 
-        base_url = URLBuilder.get_historic_matches_url(sport=sport, league=league, season=season, discovered_leagues=discovered_leagues)
-        self.logger.info(f"Starting historic scraping for {sport} - {league} - {season}")
+        base_url = URLBuilder.get_historic_matches_url(sport=sports, league=league, season=season, discovered_leagues=discovered_leagues)
+        self.logger.info(f"Starting historic scraping for {sports} - {league} - {season}")
         self.logger.info(f"Base URL: {base_url}")
         self.logger.info(f"Max pages parameter: {max_pages}")
 
@@ -93,7 +93,7 @@ class OddsPortalScraper(BaseScraper):
         self.logger.info(f"Total unique matches to process: {len(all_links)}")
 
         return await self.extract_match_odds(
-            sport=sport,
+            sport=sports,
             match_links=all_links,
             markets=markets,
             scrape_odds_history=scrape_odds_history,
@@ -103,7 +103,7 @@ class OddsPortalScraper(BaseScraper):
 
     async def scrape_upcoming(
         self,
-        sport: str,
+        sports: str,
         date: str,
         league: str | None = None,
         markets: list[str] | None = None,
@@ -115,7 +115,7 @@ class OddsPortalScraper(BaseScraper):
         Scrapes upcoming match odds.
 
         Args:
-            sport (str): The sport to scrape.
+            sports (str): The sport to scrape.
             date (str): The date to scrape.
             league (Optional[str]): The league to scrape.
             markets (Optional[List[str]]): List of markets.
@@ -129,7 +129,7 @@ class OddsPortalScraper(BaseScraper):
         if not current_page:
             raise RuntimeError("Playwright has not been initialized. Call `start_playwright()` first.")
 
-        url = URLBuilder.get_upcoming_matches_url(sport=sport, date=date, league=league, discovered_leagues=discovered_leagues)
+        url = URLBuilder.get_upcoming_matches_url(sport=sports, date=date, league=league, discovered_leagues=discovered_leagues)
         self.logger.info(f"Fetching upcoming odds from {url}")
 
         await current_page.goto(url, timeout=10000, wait_until="domcontentloaded")
@@ -152,7 +152,7 @@ class OddsPortalScraper(BaseScraper):
             return []
 
         return await self.extract_match_odds(
-            sport=sport,
+            sport=sports,
             match_links=match_links,
             markets=markets,
             scrape_odds_history=scrape_odds_history,
@@ -163,7 +163,7 @@ class OddsPortalScraper(BaseScraper):
     async def scrape_matches(
         self,
         match_links: list[str],
-        sport: str,
+        sports: str,
         markets: list[str] | None = None,
         scrape_odds_history: bool = True,  # Always scrape odds history by default
         target_bookmaker: str | None = None,
@@ -173,7 +173,7 @@ class OddsPortalScraper(BaseScraper):
 
         Args:
             match_links (List[str]): List of URLs of matches to scrape.
-            sport (str): The sport to scrape.
+            sports (str): The sport to scrape.
             markets (List[str] | None): List of betting markets to scrape. Defaults to None.
             scrape_odds_history (bool): Whether to scrape and attach odds history.
             target_bookmaker (str): If set, only scrape odds for this bookmaker.
@@ -188,7 +188,7 @@ class OddsPortalScraper(BaseScraper):
         await current_page.goto(ODDSPORTAL_BASE_URL, timeout=20000, wait_until="domcontentloaded")
         await self._prepare_page_for_scraping(page=current_page)
         return await self.extract_match_odds(
-            sport=sport,
+            sport=sports,
             match_links=match_links,
             markets=markets,
             scrape_odds_history=scrape_odds_history,

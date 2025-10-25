@@ -255,12 +255,12 @@ class URLBuilder:
         )
 
     @staticmethod
-    async def discover_available_seasons(sport: str, league: str, page, discovered_leagues: Dict[str, str] | None = None) -> Optional[List[int]]:
+    async def discover_available_seasons(sports: str, league: str, page, discovered_leagues: Dict[str, str] | None = None) -> Optional[List[int]]:
         """
         Auto-discover the exact available seasons for a league.
 
         Args:
-            sport (str): The sport name
+            sports (str): The sport name
             league (str): The league identifier
             page: Playwright page object for navigation
             discovered_leagues (Optional[Dict[str, str]]): Dynamically discovered leagues mapping.
@@ -272,10 +272,10 @@ class URLBuilder:
 
         try:
             # Navigate to the league's main results page (current season)
-            league_url = URLBuilder.get_league_url(sport, league, discovered_leagues)
+            league_url = URLBuilder.get_league_url(sports, league, discovered_leagues)
             results_url = f"{league_url}/results/"
 
-            logger.debug(f"Discovering seasons for {sport}/{league} at {results_url}")
+            logger.debug(f"Discovering seasons for {sports}/{league} at {results_url}")
 
             await page.goto(results_url, timeout=15000, wait_until="domcontentloaded")
             await page.wait_for_timeout(2000)  # Allow content to load
@@ -352,14 +352,14 @@ class URLBuilder:
             if seasons_found:
                 sorted_seasons = sorted(seasons_found)
 
-                logger.info(f"Discovered {len(sorted_seasons)} exact seasons for {sport}/{league}: {sorted_seasons}")
+                logger.info(f"Discovered {len(sorted_seasons)} exact seasons for {sports}/{league}: {sorted_seasons}")
                 return sorted_seasons
             else:
                 # If no seasons found on a valid league page, this indicates a real problem
-                raise ValueError(f"No seasons discovered on league page for {sport}/{league}. League exists but no season data found.")
+                raise ValueError(f"No seasons discovered on league page for {sports}/{league}. League exists but no season data found.")
 
         except Exception as e:
-            logger.error(f"Error discovering seasons for {sport}/{league}: {e}")
+            logger.error(f"Error discovering seasons for {sports}/{league}: {e}")
             raise  # Re-raise the exception - don't hide real problems
 
     @staticmethod

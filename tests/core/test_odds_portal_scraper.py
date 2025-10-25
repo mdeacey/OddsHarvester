@@ -120,7 +120,7 @@ async def test_scrape_historic(url_builder_mock, setup_scraper_mocks):
 
     # Call the method under test
     result = await scraper.scrape_historic(
-        sport="football",
+        sports="football",
         league="premier-league",
         season="2023",
         markets=["1x2"],
@@ -174,7 +174,7 @@ async def test_scrape_upcoming(url_builder_mock, setup_scraper_mocks):
 
     # Call the method under test
     result = await scraper.scrape_upcoming(
-        sport="football",
+        sports="football",
         date="2023-06-01",
         league="premier-league",
         markets=["1x2", "over_under"],
@@ -217,7 +217,7 @@ async def test_scrape_matches(setup_scraper_mocks):
 
     # Call the method under test
     result = await scraper.scrape_matches(
-        match_links=match_links, sport="tennis", markets=["1x2"], scrape_odds_history=True, target_bookmaker="bwin"
+        match_links=match_links, sports="tennis", markets=["1x2"], scrape_odds_history=True, target_bookmaker="bwin"
     )
 
     # Verify the interactions
@@ -354,3 +354,250 @@ async def test_collect_match_links_error_handling(setup_scraper_mocks):
     # Verify the result still contains successful page links
     assert result == ["https://oddsportal.com/match1"]
     assert tab_mock.close.call_count == 2  # Should still close tabs even after error
+
+
+class TestSportsParameterUpdates:
+    """Test suite for sports parameter updates to ensure consistency with FEAT-001."""
+
+    @pytest.mark.asyncio
+    @patch("src.core.odds_portal_scraper.URLBuilder")
+    async def test_scrape_historic_sports_parameter(url_builder_mock, setup_scraper_mocks):
+        """Test that scrape_historic correctly uses sports parameter."""
+        mocks = setup_scraper_mocks
+        scraper = mocks["scraper"]
+        page_mock = mocks["page_mock"]
+
+        # Mock the URLBuilder and internal methods
+        url_builder_mock.get_historic_matches_url.return_value = "https://oddsportal.com/football/england/premier-league-2023"
+        scraper._get_pagination_info = AsyncMock(return_value=[1])
+        scraper._collect_match_links = AsyncMock(return_value=["https://oddsportal.com/match1"])
+        scraper.extract_match_odds = AsyncMock(return_value=[{"match": "data"}])
+        scraper._prepare_page_for_scraping = AsyncMock()
+
+        # Test with various sports values
+        test_sports = ["football", "tennis", "basketball", "aussie-rules"]
+
+        for sport in test_sports:
+            # Reset mocks
+            url_builder_mock.reset_mock()
+
+            # Call the method under test
+            await scraper.scrape_historic(
+                sports=sport,
+                league="test-league",
+                season="2023",
+                markets=["1x2"]
+            )
+
+            # Verify URLBuilder was called with correct sport parameter
+            url_builder_mock.get_historic_matches_url.assert_called_once_with(
+                sport=sport, league="test-league", season="2023", discovered_leagues=None
+            )
+
+            # Verify extract_match_odds was called with correct sport parameter
+            scraper.extract_match_odds.assert_called_once_with(
+                sport=sport,
+                match_links=["https://oddsportal.com/match1"],
+                markets=["1x2"],
+                scrape_odds_history=True,
+                target_bookmaker=None,
+                preview_submarkets_only=False,
+            )
+
+    @pytest.mark.asyncio
+    @patch("src.core.odds_portal_scraper.URLBuilder")
+    async def test_scrape_upcoming_sports_parameter(url_builder_mock, setup_scraper_mocks):
+        """Test that scrape_upcoming correctly uses sports parameter."""
+        mocks = setup_scraper_mocks
+        scraper = mocks["scraper"]
+        page_mock = mocks["page_mock"]
+
+        # Mock the URLBuilder and internal methods
+        url_builder_mock.get_upcoming_matches_url.return_value = "https://oddsportal.com/football/matches/20231201"
+        scraper._prepare_page_for_scraping = AsyncMock()
+        scraper.extract_match_links = AsyncMock(return_value=["https://oddsportal.com/match1"])
+        scraper.extract_match_odds = AsyncMock(return_value=[{"match": "data"}])
+
+        # Test with various sports values
+        test_sports = ["football", "tennis", "basketball", "baseball"]
+
+        for sport in test_sports:
+            # Reset mocks
+            url_builder_mock.reset_mock()
+            scraper.extract_match_odds.reset_mock()
+
+            # Call the method under test
+            await scraper.scrape_upcoming(
+                sports=sport,
+                date="2023-12-01",
+                league="test-league",
+                markets=["1x2"]
+            )
+
+            # Verify URLBuilder was called with correct sport parameter
+            url_builder_mock.get_upcoming_matches_url.assert_called_once_with(
+                sport=sport, date="2023-12-01", league="test-league", discovered_leagues=None
+            )
+
+            # Verify extract_match_odds was called with correct sport parameter
+            scraper.extract_match_odds.assert_called_once_with(
+                sport=sport,
+                match_links=["https://oddsportal.com/match1"],
+                markets=["1x2"],
+                scrape_odds_history=True,
+                target_bookmaker=None,
+                preview_submarkets_only=False,
+            )
+
+    @pytest.mark.asyncio
+    @patch("src.core.odds_portal_scraper.ODDSPORTAL_BASE_URL", "https://oddsportal.com")
+    async def test_scrape_matches_sports_parameter(setup_scraper_mocks):
+        """Test that scrape_matches correctly uses sports parameter."""
+        mocks = setup_scraper_mocks
+        scraper = mocks["scraper"]
+        page_mock = mocks["page_mock"]
+
+        # Mock internal methods
+        scraper._prepare_page_for_scraping = AsyncMock()
+        scraper.extract_match_odds = AsyncMock(return_value=[{"match": "data"}])
+
+        # Test with various sports values
+        test_sports = ["football", "tennis", "basketball", "ice-hockey"]
+        match_links = ["https://oddsportal.com/match1"]
+
+        for sport in test_sports:
+            # Reset mocks
+            scraper.extract_match_odds.reset_mock()
+
+            # Call the method under test
+            await scraper.scrape_matches(
+                match_links=match_links,
+                sports=sport,
+                markets=["1x2"]
+            )
+
+            # Verify extract_match_odds was called with correct sport parameter
+            scraper.extract_match_odds.assert_called_once_with(
+                sport=sport,
+                match_links=match_links,
+                markets=["1x2"],
+                scrape_odds_history=True,
+                target_bookmaker=None,
+                concurrent_scraping_task=1,
+                preview_submarkets_only=False,
+            )
+
+    @pytest.mark.asyncio
+    @patch("src.core.odds_portal_scraper.URLBuilder")
+    async def test_sports_parameter_with_discovered_leagues(url_builder_mock, setup_scraper_mocks):
+        """Test that sports parameter works correctly with discovered leagues."""
+        mocks = setup_scraper_mocks
+        scraper = mocks["scraper"]
+
+        # Mock URLBuilder and internal methods
+        url_builder_mock.get_historic_matches_url.return_value = "https://oddsportal.com/afl/australia/afl-2023"
+        scraper._get_pagination_info = AsyncMock(return_value=[1])
+        scraper._collect_match_links = AsyncMock(return_value=["https://oddsportal.com/match1"])
+        scraper.extract_match_odds = AsyncMock(return_value=[{"match": "data"}])
+        scraper._prepare_page_for_scraping = AsyncMock()
+
+        discovered_leagues = {"afl": "https://oddsportal.com/afl/australia/afl"}
+
+        # Call the method under test
+        await scraper.scrape_historic(
+            sports="aussie-rules",
+            league="afl",
+            season="2023",
+            markets=["1x2"],
+            discovered_leagues=discovered_leagues
+        )
+
+        # Verify URLBuilder was called with correct parameters including discovered leagues
+        url_builder_mock.get_historic_matches_url.assert_called_once_with(
+            sport="aussie-rules", league="afl", season="2023", discovered_leagues=discovered_leagues
+        )
+
+    @pytest.mark.asyncio
+    @patch("src.core.odds_portal_scraper.URLBuilder")
+    async def test_sports_parameter_logging(url_builder_mock, setup_scraper_mocks):
+        """Test that logging messages use the correct sports parameter."""
+        mocks = setup_scraper_mocks
+        scraper = mocks["scraper"]
+        page_mock = mocks["page_mock"]
+
+        # Mock URLBuilder and internal methods
+        url_builder_mock.get_historic_matches_url.return_value = "https://oddsportal.com/basketball/nba/nba-2023"
+        scraper._get_pagination_info = AsyncMock(return_value=[1])
+        scraper._collect_match_links = AsyncMock(return_value=[])
+        scraper.extract_match_odds = AsyncMock(return_value=[])
+        scraper._prepare_page_for_scraping = AsyncMock()
+
+        # Mock the logger to capture log messages
+        with patch.object(scraper.logger, 'info') as mock_logger_info:
+            await scraper.scrape_historic(
+                sports="basketball",
+                league="nba",
+                season="2023"
+            )
+
+            # Verify that log messages contain the correct sport name
+            log_calls = [str(call) for call in mock_logger_info.call_args_list]
+            assert any("basketball - nba - 2023" in call for call in log_calls)
+
+    @pytest.mark.asyncio
+    @patch("src.core.odds_portal_scraper.URLBuilder")
+    async def test_sports_parameter_all_markets(url_builder_mock, setup_scraper_mocks):
+        """Test that sports parameter works correctly with all markets."""
+        mocks = setup_scraper_mocks
+        scraper = mocks["scraper"]
+
+        # Mock URLBuilder and internal methods
+        url_builder_mock.get_upcoming_matches_url.return_value = "https://oddsportal.com/tennis/atp-tour/matches/20231201"
+        scraper._prepare_page_for_scraping = AsyncMock()
+        scraper.extract_match_links = AsyncMock(return_value=["https://oddsportal.com/match1"])
+        scraper.extract_match_odds = AsyncMock(return_value=[{"match": "data"}])
+
+        # Test with all markets
+        all_markets = ["1x2", "over_under", "handicap", "correct_score"]
+
+        await scraper.scrape_upcoming(
+            sports="tennis",
+            date="2023-12-01",
+            markets=all_markets,
+            scrape_odds_history=True,
+            target_bookmaker="bet365"
+        )
+
+        # Verify all markets were passed correctly
+        scraper.extract_match_odds.assert_called_once_with(
+            sport="tennis",
+            match_links=["https://oddsportal.com/match1"],
+            markets=all_markets,
+            scrape_odds_history=True,
+            target_bookmaker="bet365",
+            preview_submarkets_only=False,
+        )
+
+    @pytest.mark.asyncio
+    @patch("src.core.odds_portal_scraper.URLBuilder")
+    async def test_sports_parameter_error_handling(url_builder_mock, setup_scraper_mocks):
+        """Test that error handling works correctly with sports parameter."""
+        mocks = setup_scraper_mocks
+        scraper = mocks["scraper"]
+        page_mock = mocks["page_mock"]
+
+        # Mock URLBuilder to raise an exception
+        url_builder_mock.get_historic_matches_url.side_effect = ValueError("Invalid sport parameter")
+
+        # Test that errors are properly raised with sports parameter
+        with pytest.raises(ValueError, match="Invalid sport parameter"):
+            await scraper.scrape_historic(
+                sports="invalid-sport",
+                league="test-league",
+                season="2023"
+            )
+
+        # Verify the error was raised from the correct parameter usage
+        url_builder_mock.get_historic_matches_url.assert_called_once_with(
+            sport="invalid-sport", league="test-league", season="2023", discovered_leagues=None
+        )

@@ -588,3 +588,198 @@ class TestHistoricMatchesUrlsForRangeEdgeCases:
         first_season = urls_with_seasons[0][1]
         assert first_season == "2020"
         assert urls_with_seasons[0][0] == f"{ODDSPORTAL_BASE_URL}/football/england/premier-league-2020/results/"
+
+
+class TestSportsParameterUpdates:
+    """Test suite for sports parameter updates to ensure consistency with FEAT-001."""
+
+    @pytest.mark.asyncio
+    async def test_discover_available_seasons_sports_parameter(self, discovered_leagues):
+        """Test that discover_available_seasons correctly uses sports parameter."""
+        from unittest.mock import AsyncMock
+
+        mock_page = AsyncMock()
+        mock_page.goto = AsyncMock()
+        mock_page.wait_for_timeout = AsyncMock()
+        mock_page.query_selector_all = AsyncMock(return_value=[])
+        mock_page.content = AsyncMock(return_value='<html>Season 2020-2021 Season 2021-2022 Season 2022-2023</html>')
+
+        # Test with various sports values
+        test_sports = ["football", "tennis", "basketball", "aussie-rules"]
+
+        for sport in test_sports:
+            # Reset mocks
+            mock_page.goto.reset_mock()
+            mock_page.wait_for_timeout.reset_mock()
+
+            # Call the method under test
+            seasons = await URLBuilder.discover_available_seasons(
+                sport, "test-league", mock_page, discovered_leagues
+            )
+
+            # Verify page.goto was called with correct URL containing sport
+            mock_page.goto.assert_called_once()
+            call_args = mock_page.goto.call_args[0][0]
+            assert f"/{sport}/" in call_args
+
+            # Should find seasons 2020, 2021, 2022, and 2023 in content
+            expected_seasons = [2020, 2021, 2022, 2023]
+            assert seasons == expected_seasons
+
+    @pytest.mark.asyncio
+    async def test_discover_available_seasons_logging_uses_sports_parameter(self):
+        """Test that logging messages use the correct sports parameter."""
+        from unittest.mock import AsyncMock, patch
+        import logging
+
+        mock_page = AsyncMock()
+        mock_page.goto = AsyncMock()
+        mock_page.wait_for_timeout = AsyncMock()
+        mock_page.query_selector_all = AsyncMock(return_value=[])
+        mock_page.content = AsyncMock(return_value='<html>Season 2025 Season 2024</html>')
+
+        # Mock the logger to capture log messages
+        with patch('logging.getLogger') as mock_get_logger:
+            mock_logger = MagicMock()
+            mock_get_logger.return_value = mock_logger
+
+            # Call the method with aussie-rules sport
+            await URLBuilder.discover_available_seasons(
+                "aussie-rules", "afl", mock_page
+            )
+
+            # Verify that debug log messages contain the correct sport name
+            debug_calls = [str(call) for call in mock_logger.debug.call_args_list]
+            assert any("aussie-rules/afl" in call for call in debug_calls)
+
+            # Verify that info log messages contain the correct sport name
+            info_calls = [str(call) for call in mock_logger.info.call_args_list]
+            assert any("aussie-rules/afl" in call for call in info_calls)
+
+    @pytest.mark.asyncio
+    async def test_discover_available_seasons_error_handling_uses_sports_parameter(self):
+        """Test that error handling uses the correct sports parameter in error messages."""
+        from unittest.mock import AsyncMock
+
+        mock_page = AsyncMock()
+        mock_page.goto = AsyncMock()
+        mock_page.wait_for_timeout = AsyncMock()
+        mock_page.query_selector_all = AsyncMock(return_value=[])
+        mock_page.content = AsyncMock(return_value='<html>No seasons here</html>')
+
+        # Test that error messages contain the correct sport name
+        with pytest.raises(ValueError, match="No seasons discovered on league page for basketball/nba"):
+            await URLBuilder.discover_available_seasons(
+                "basketball", "nba", mock_page
+            )
+
+    @pytest.mark.asyncio
+    async def test_discover_available_seasons_exception_propagation_uses_sports_parameter(self):
+        """Test that exception propagation uses the correct sports parameter."""
+        from unittest.mock import AsyncMock
+
+        mock_page = AsyncMock()
+        mock_page.goto = AsyncMock(side_effect=Exception("Navigation failed for tennis"))
+
+        # Test that exceptions are properly raised and contain sport-specific context
+        with pytest.raises(Exception, match="Navigation failed for tennis"):
+            await URLBuilder.discover_available_seasons(
+                "tennis", "atp-tour", mock_page
+            )
+
+        # Verify the method was called with correct sport
+        mock_page.goto.assert_called_once()
+        call_args = mock_page.goto.call_args[0][0]
+        assert "/tennis/" in call_args
+
+    @pytest.mark.asyncio
+    async def test_discover_available_seasons_with_discovered_leagues_sports_parameter(self):
+        """Test discover_available_seasons works with discovered leagues and sports parameter."""
+        from unittest.mock import AsyncMock
+
+        mock_page = AsyncMock()
+        mock_page.goto = AsyncMock()
+        mock_page.wait_for_timeout = AsyncMock()
+        mock_page.query_selector_all = AsyncMock(return_value=[])
+        mock_page.content = AsyncMock(return_value='<html>Season 2019 Season 2020 Season 2021</html>')
+
+        # Custom discovered leagues for aussie-rules sport
+        custom_discovered_leagues = {
+            "afl": "https://oddsportal.com/afl/australia/afl"
+        }
+
+        # Call the method with aussie-rules sport
+        seasons = await URLBuilder.discover_available_seasons(
+            "aussie-rules", "afl", mock_page, custom_discovered_leagues
+        )
+
+        # Verify the correct URL was constructed and called
+        expected_url = "https://oddsportal.com/afl/australia/afl/results/"
+        mock_page.goto.assert_called_once_with(expected_url, timeout=15000, wait_until="domcontentloaded")
+
+        # Should find seasons 2019, 2020, and 2021
+        expected_seasons = [2019, 2020, 2021]
+        assert seasons == expected_seasons
+
+    @pytest.mark.asyncio
+    async def test_discover_available_seasons_complex_sport_names(self):
+        """Test discover_available_seasons with complex sport names like aussie-rules."""
+        from unittest.mock import AsyncMock
+
+        mock_page = AsyncMock()
+        mock_page.goto = AsyncMock()
+        mock_page.wait_for_timeout = AsyncMock()
+        mock_page.query_selector_all = AsyncMock(return_value=[])
+        mock_page.content = AsyncMock(return_value='<html>Season 2022 Season 2023 Season 2024</html>')
+
+        # Test with complex sport name
+        seasons = await URLBuilder.discover_available_seasons(
+            "aussie-rules", "afl", mock_page
+        )
+
+        # Verify the correct URL was constructed with complex sport name
+        mock_page.goto.assert_called_once()
+        call_args = mock_page.goto.call_args[0][0]
+        assert "/afl/" in call_args
+
+        # Should find seasons 2022, 2023, and 2024
+        expected_seasons = [2022, 2023, 2024]
+        assert seasons == expected_seasons
+
+    @pytest.mark.asyncio
+    async def test_discover_available_seasons_url_construction_various_sports(self):
+        """Test that URL construction works correctly for various sports."""
+        from unittest.mock import AsyncMock
+
+        mock_page = AsyncMock()
+        mock_page.goto = AsyncMock()
+        mock_page.wait_for_timeout = AsyncMock()
+        mock_page.query_selector_all = AsyncMock(return_value=[])
+        mock_page.content = AsyncMock(return_value='<html>Season 2021</html>')
+
+        # Test data: sport -> expected URL path
+        test_cases = [
+            ("football", "football/england/premier-league"),
+            ("tennis", "tennis/atp-tour"),
+            ("basketball", "basketball/usa/nba"),
+            ("baseball", "baseball/usa/mlb"),
+            ("aussie-rules", "aussie-rules/australia/afl"),
+        ]
+
+        for sport, expected_path in test_cases:
+            # Reset mocks
+            mock_page.goto.reset_mock()
+
+            # Create test discovered leagues for this sport
+            test_discovered_leagues = {
+                "test-league": f"https://oddsportal.com/{expected_path}"
+            }
+
+            # Call the method
+            await URLBuilder.discover_available_seasons(
+                sport, "test-league", mock_page, test_discovered_leagues
+            )
+
+            # Verify correct URL was called
+            expected_url = f"https://oddsportal.com/{expected_path}/results/"
+            mock_page.goto.assert_called_once_with(expected_url, timeout=15000, wait_until="domcontentloaded")
