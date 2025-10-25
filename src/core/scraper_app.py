@@ -293,7 +293,7 @@ async def _scrape_multiple_leagues(scraper, scrape_func, leagues: list[str], spo
         try:
             logger.info(f"[{i}/{len(leagues)}] Processing league: {league}")
 
-            league_data = await retry_scrape(scrape_func, sport=sport, league=league, **kwargs)
+            league_data = await retry_scrape(scrape_func, sport=sports, league=league, **kwargs)
 
             if league_data:
                 all_results.extend(league_data)
@@ -346,7 +346,7 @@ async def _scrape_all_sports(scraper, scrape_func, **kwargs) -> list[dict]:
 
             # For both upcoming and historic scraping, pass league=None to scrape all available leagues
             # This allows the scraper to discover and scrape all leagues for each sport
-            sport_data = await retry_scrape(scrape_func, sport=sport.value, league=None, **kwargs)
+            sport_data = await retry_scrape(scrape_func, sport=sports.value, league=None, **kwargs)
 
             if sport_data:
                 all_results.extend(sport_data)
@@ -418,12 +418,12 @@ async def _scrape_all_sports_date_range(scraper, command: CommandEnum, from_date
             if command == CommandEnum.UPCOMING_MATCHES:
                 # For upcoming matches, scrape all leagues for each date in range
                 sport_data = await _scrape_single_sport_date_range(
-                    scraper, command, sport.value, from_date, to_date, **kwargs
+                    scraper, command, sports.value, from_date, to_date, **kwargs
                 )
             else:  # HISTORIC
                 # For historic matches, we need to pass league=None to discover all leagues
                 sport_data = await _scrape_single_sport_date_range(
-                    scraper, command, sport.value, from_date, to_date, league=None, **kwargs
+                    scraper, command, sports.value, from_date, to_date, league=None, **kwargs
                 )
 
             if sport_data:
@@ -611,7 +611,7 @@ async def _scrape_upcoming_date_range(scraper, sport: str, from_date: str, to_da
 
             date_data = await retry_scrape(
                 scraper.scrape_upcoming,
-                sport=sport,
+                sport=sports,
                 date=date_str.replace("-", ""),  # Convert back to YYYYMMDD format
                 league=league,
                 discovered_leagues=discovered_leagues,
@@ -658,24 +658,24 @@ async def _scrape_historic_all_leagues(scraper, sport: str, from_date: str, to_d
         List of combined results from all leagues and seasons
     """
     try:
-        sport_enum = Sport(sport)
+        sport_enum = Sport(sports)
     except ValueError:
-        logger.error(f"Unsupported sport '{sport}' for league discovery")
+        logger.error(f"Unsupported sport '{sports}' for league discovery")
         return []
 
     # Use dynamic league discovery instead of hardcoded constants
-    logger.info(f"Dynamically discovering leagues for sport '{sport}'")
+    logger.info(f"Dynamically discovering leagues for sport '{sports}'")
     try:
-        leagues = await URLBuilder.discover_leagues_for_sport(sport, scraper.playwright_manager.page)
+        leagues = await URLBuilder.discover_leagues_for_sport(sports, scraper.playwright_manager.page)
 
         if not leagues:
-            logger.error(f"No leagues discovered for sport '{sport}'")
+            logger.error(f"No leagues discovered for sport '{sports}'")
             return []
 
-        logger.info(f"Discovered {len(leagues)} leagues for sport '{sport}': {', '.join(list(leagues.keys())[:10])}{'...' if len(leagues) > 10 else ''}")
+        logger.info(f"Discovered {len(leagues)} leagues for sport '{sports}': {', '.join(list(leagues.keys())[:10])}{'...' if len(leagues) > 10 else ''}")
 
     except Exception as e:
-        logger.error(f"Failed to discover leagues for sport '{sport}': {str(e)}")
+        logger.error(f"Failed to discover leagues for sport '{sports}': {str(e)}")
         return []
 
     all_results = []
@@ -756,7 +756,7 @@ async def _scrape_historic_date_range(scraper, sport: str, league: str, from_dat
 
             season_data = await retry_scrape(
                 scraper.scrape_historic,
-                sport=sport,
+                sport=sports,
                 league=league,
                 season=season_str,
                 discovered_leagues=discovered_leagues,
