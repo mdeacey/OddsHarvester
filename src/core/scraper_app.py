@@ -742,7 +742,7 @@ async def _scrape_historic_date_range(scraper, sport: str, league: str, from_dat
     else:
         # Use specified date range
         try:
-            urls_with_seasons = URLBuilder.get_historic_matches_urls_for_range(sport, from_date, to_date, league)
+            urls_with_seasons = URLBuilder.get_historic_matches_urls_for_range(sport, from_date, to_date, league, discovered_leagues or {})
         except ValueError as e:
             logger.error(f"Error generating URLs for season range: {e}")
             raise
